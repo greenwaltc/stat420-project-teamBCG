@@ -1,6 +1,8 @@
 ---
-title: "proposal"
-output: html_document
+title: "Final Project Proposal"
+output:
+  html_document: default
+  pdf_document: default
 date: "2023-07-20"
 ---
 
@@ -8,4 +10,43 @@ date: "2023-07-20"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Team members
+1. Cameron Greenwalt
+1. Mark Bauer
+1. Ben Carman
+
+# Project Title
+Predicting Grain Crop Yields in India for Years 1997 - 2020
+
+# Data Description
+
+The **Agricultural Crop Yield in Indian States Dataset** contains information about crop type, inputs, weather, time (year), and yield for various crops grown in India. It has 9 predictors which we will use to predict `Yield`.
+
+The data set was pulled from [Kaggle]([https://www.kaggle.com/datasets/akshatgupta7/crop-yield-in-indian-states-dataset). The author aggregated data from the following sources to create the dataset:
+
+1. https://data.gov.in/catalog/district-wise-season-wise-crop-production-statistics-0
+1. https://www.fao.org/faostat/en/#data
+1. https://data.gov.in/catalog/rainfall-india
+1. https://environicsindia.in/
+1. https://www.imdpune.gov.in/library/public/e-book110.pdf
+
+
+In addition to being well curated, the data is of interest because one of our team members (Mark Bauer) has an agricultural background.  We are curious to know more about efficient land usage as well as how weather and inputs interact to determine yield for the several crops we will examine. We will limit the types of crops under observation to a subset of grains (e.g., wheat, barley, rye, etc.).
+
+## Evidence that the data can be loaded into R
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+
+crops = read_csv("crop_yield.csv")
+
+# Other grain types may be added later
+crops = crops[crops$Crop %in% c("Wheat", "Barley", "Maize", "Rye", "Rice"),]
+
+# Yield is our response
+kable(
+  head(crops, 5)
+)
+```
 
