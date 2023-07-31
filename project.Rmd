@@ -1,0 +1,140 @@
+---
+title: "project"
+output: html_document
+date: "2023-07-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(plyr)
+library(car)
+library(glmnet)
+```
+
+```{r message=FALSE}
+crops = read_csv("crop_yield.csv")
+```
+
+
+```{r message=FALSE, warning=FALSE}
+
+grains = c( "Amaranth", "Barley", "Bulgur", "Corn", "Farro", "Einkorn", "Emmer",
+            "Spelt", "Millet", "Freaked", "Farik", "Durum Wheat", 
+            "Khorasan Wheat", "Oats", "Quinoa", "Kana", "Rice", "Rye", 
+            "Sorghum", "Teff", "Triticale", "Wheat", "Wild Rice", "Wheat", 
+            "Wheat berries", "Hominy", "Spelt", "Rye", "Brown Rice", "Farro", 
+            "Emmer", "Barley", "Bran", "Durum Wheat ", "Triticale", 
+            "Bulgur Wheat", "Couscous", "Farina", "Kamut", "Orzo", "Semolina", 
+            "Graham", "Oats", "Corn", "maize", "Cornflour ", "Cornmeal", "Rice", 
+            "Wild Rice", "Teff", "Montina flour", "Sorghum", "Oats", "Freekeh", 
+            "Emmer", "Eikorn", "Malt", "Graham", "Couscous", "Polenta", "Muesli", 
+            "Seitan", "Panko", "Grain Alcohol", "Atta Flour", "Amaranth", "Quinoa", 
+            "Millet", "Barley Malt", "Beer", "Bleached Flour", "Breads", 
+            "Baked Goods", "Brown Rice Syrup", "Buckwheat", "Corn Flakes", 
+            "Croutons", "Cereals", "Wheat Germ", "Enriched Bleach Flour", 
+            "Malted Barley Flour", "Millet", "Granary Flour", "Groats", 
+            "Pastas", "Matzo", "Rice Milk", "Seitan", "Tabbouleh", "Udon", 
+            "Corn Starch", "Wheat nuts", "Other Cereals"
+)
+
+# Other grain types may be added later
+crops = crops[str_squish(tolower(crops$Crop)) %in% str_squish(tolower(grains)),]
+
+crops$Crop = as.factor(crops$Crop)
+crops$Season = as.factor(crops$Season)
+crops$State = as.factor(crops$State)
+
+levels(crops$Crop)
+
+# Yield is our response
+kable(
+  head(crops, 5)
+)
+```
+
+```{r}
+levels(crops$Season)
+```
+
+```{r}
+levels(crops$State)
+
+states_to_zones = c(
+  "Chandigarh" = "Northern Zonal Council",
+  "Delhi" = "Northern Zonal Council",
+  "Haryana" = "Northern Zonal Council",
+  "Himachal Pradesh" = "Northern Zonal Council",
+  "Jammu and Kashmir" = "Northern Zonal Council",
+  "Ladakh" = "Northern Zonal Council",
+  "Punjab" = "Northern Zonal Council",
+  "Rajasthan" = "Northern Zonal Council",
+  "Assam" = "North Eastern Council",
+  "Arunachal Pradesh" = "North Eastern Council",
+  "Manipur" = "North Eastern Council",
+  "Meghalaya" = "North Eastern Council",
+  "Mizoram" = "North Eastern Council",
+  "Nagaland" = "North Eastern Council",
+  "Tripura" = "North Eastern Council",
+  "Sikkim" = "North Eastern Council",
+  "Chhattisgarh" = "Central Zonal Council",
+  "Madhya Pradesh" = "Central Zonal Council",
+  "Uttarakhand" = "Central Zonal Council",
+  "Uttar Pradesh" = "Central Zonal Council",
+  "Bihar" = "Eastern Zonal Council",
+  "Jharkhand" = "Eastern Zonal Council",
+  "Odisha" = "Eastern Zonal Council",
+  "West Bengal" = "Eastern Zonal Council",
+  "Goa" = "Western Zonal Council",
+  "Gujarat" = "Western Zonal Council",
+  "Maharashtra" = "Western Zonal Council",
+  "Andhra Pradesh" = "Southern Zonal Council",
+  "Karnataka" = "Southern Zonal Council",
+  "Kerala" = "Southern Zonal Council",
+  "Puducherry" = "Southern Zonal Council",
+  "Tamil Nadu" = "Southern Zonal Council",
+  "Telangana" = "Southern Zonal Council"
+)
+
+crops$State = revalue(crops$State, states_to_zones)
+crops$State = as.factor(crops$State)
+levels(crops$State)
+```
+
+```{r fig.height=5, fig.width=10}
+resp = "Yield"
+preds.continuous = c("Crop_Year", "Area", "Production", "Annual_Rainfall", 
+                     "Fertilizer", "Pesticide")
+preds.categorical = c("Crop", "Season", "State")
+pairs(crops[, c(preds.continuous, resp)])
+car::vif(lm(Yield ~ ., data = crops))
+```
+
+```{r}
+simple_model = lm(Yield ~ .^2, data = crops[-744,])
+summary(simple_model)
+plot(predict(simple_model, newdata = crops[-744,]), resid(simple_model))
+# length(coef(simple_model))
+
+which.max(resid(simple_model))
+
+model.aic.backward = step(simple_model, direction = "backward", trace = 0)
+summary(model.aic.backward)
+```
+
+```{r}
+f <- as.formula(Yield ~ .^2)
+y <- crops$Yield
+x <- (model.matrix(f, crops))
+model.lasso.cv = cv.glmnet(x, y, alpha = 1)
+best_lambda = model.lasso.cv$lambda.min
+plot(model.lasso.cv)
+
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+coef(best_model)
+```
+
