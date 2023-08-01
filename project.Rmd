@@ -8,12 +8,13 @@ date: "2023-07-31"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(knitr)
 library(plyr)
 library(car)
 library(glmnet)
+library(MASS)
 ```
 
 ```{r message=FALSE}
@@ -51,6 +52,9 @@ crops$State = as.factor(crops$State)
 
 levels(crops$Crop)
 
+# Drop rows with NA. Probably bad idea to do this
+crops = na.omit(crops)
+
 # Yield is our response
 kable(
   head(crops, 5)
@@ -64,40 +68,42 @@ levels(crops$Season)
 ```{r}
 levels(crops$State)
 
+# See https://en.wikipedia.org/wiki/Administrative_divisions_of_India
+
 states_to_zones = c(
-  "Chandigarh" = "Northern Zonal Council",
-  "Delhi" = "Northern Zonal Council",
-  "Haryana" = "Northern Zonal Council",
-  "Himachal Pradesh" = "Northern Zonal Council",
-  "Jammu and Kashmir" = "Northern Zonal Council",
-  "Ladakh" = "Northern Zonal Council",
-  "Punjab" = "Northern Zonal Council",
-  "Rajasthan" = "Northern Zonal Council",
-  "Assam" = "North Eastern Council",
-  "Arunachal Pradesh" = "North Eastern Council",
-  "Manipur" = "North Eastern Council",
-  "Meghalaya" = "North Eastern Council",
-  "Mizoram" = "North Eastern Council",
-  "Nagaland" = "North Eastern Council",
-  "Tripura" = "North Eastern Council",
-  "Sikkim" = "North Eastern Council",
-  "Chhattisgarh" = "Central Zonal Council",
-  "Madhya Pradesh" = "Central Zonal Council",
-  "Uttarakhand" = "Central Zonal Council",
-  "Uttar Pradesh" = "Central Zonal Council",
-  "Bihar" = "Eastern Zonal Council",
-  "Jharkhand" = "Eastern Zonal Council",
-  "Odisha" = "Eastern Zonal Council",
-  "West Bengal" = "Eastern Zonal Council",
-  "Goa" = "Western Zonal Council",
-  "Gujarat" = "Western Zonal Council",
-  "Maharashtra" = "Western Zonal Council",
-  "Andhra Pradesh" = "Southern Zonal Council",
-  "Karnataka" = "Southern Zonal Council",
-  "Kerala" = "Southern Zonal Council",
-  "Puducherry" = "Southern Zonal Council",
-  "Tamil Nadu" = "Southern Zonal Council",
-  "Telangana" = "Southern Zonal Council"
+  "Chandigarh" = "Northern",
+  "Delhi" = "Northern",
+  "Haryana" = "Northern",
+  "Himachal Pradesh" = "Northern",
+  "Jammu and Kashmir" = "Northern",
+  "Ladakh" = "Northern",
+  "Punjab" = "Northern",
+  "Rajasthan" = "Northern",
+  "Assam" = "North Eastern",
+  "Arunachal Pradesh" = "North Eastern",
+  "Manipur" = "North Eastern",
+  "Meghalaya" = "North Eastern",
+  "Mizoram" = "North Eastern",
+  "Nagaland" = "North Eastern",
+  "Tripura" = "North Eastern",
+  "Sikkim" = "North Eastern",
+  "Chhattisgarh" = "Central",
+  "Madhya Pradesh" = "Central",
+  "Uttarakhand" = "Central",
+  "Uttar Pradesh" = "Central",
+  "Bihar" = "Eastern",
+  "Jharkhand" = "Eastern",
+  "Odisha" = "Eastern",
+  "West Bengal" = "Eastern",
+  "Goa" = "Western",
+  "Gujarat" = "Western",
+  "Maharashtra" = "Western",
+  "Andhra Pradesh" = "Southern",
+  "Karnataka" = "Southern",
+  "Kerala" = "Southern",
+  "Puducherry" = "Southern",
+  "Tamil Nadu" = "Southern",
+  "Telangana" = "Southern"
 )
 
 crops$State = revalue(crops$State, states_to_zones)
@@ -106,35 +112,111 @@ levels(crops$State)
 ```
 
 ```{r fig.height=5, fig.width=10}
-resp = "Yield"
-preds.continuous = c("Crop_Year", "Area", "Production", "Annual_Rainfall", 
+vars.res = "Yield"
+vars.con = c("Crop_Year", "Area", "Production", "Annual_Rainfall", 
                      "Fertilizer", "Pesticide")
-preds.categorical = c("Crop", "Season", "State")
-pairs(crops[, c(preds.continuous, resp)])
-car::vif(lm(Yield ~ ., data = crops))
+vars.cat = c("Crop", "Season", "State")
 ```
 
 ```{r}
-simple_model = lm(Yield ~ .^2, data = crops[-744,])
-summary(simple_model)
-plot(predict(simple_model, newdata = crops[-744,]), resid(simple_model))
-# length(coef(simple_model))
+set.seed(0)
+sample = sample(c(TRUE, FALSE), nrow(crops), replace=TRUE, prob=c(0.8,0.2))
+crops.train = crops[sample, ]
+crops.test = crops[!sample, ]
 
-which.max(resid(simple_model))
+pairs(crops.train[, c(vars.con, vars.res)])
+car::vif(lm(Yield ~ ., data = crops.train))
+```
 
-model.aic.backward = step(simple_model, direction = "backward", trace = 0)
-summary(model.aic.backward)
+
+```{r}
+simple_model = lm(Yield ~ .^2, data = crops.train)
+# summary(simple_model)
 ```
 
 ```{r}
-f <- as.formula(Yield ~ .^2)
-y <- crops$Yield
-x <- (model.matrix(f, crops))
-model.lasso.cv = cv.glmnet(x, y, alpha = 1)
-best_lambda = model.lasso.cv$lambda.min
-plot(model.lasso.cv)
+simple_model.cooksd = cooks.distance(simple_model)
 
-best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
-coef(best_model)
+# These three rows are problematic for some reason. Removing them for now
+crops.train = crops.train[!is.na(simple_model.cooksd),]
+
+simple_model = lm(Yield ~ .^2, data = crops.train)
+simple_model.cooksd = cooks.distance(simple_model)
+
+simple_model.influential = simple_model.cooksd > (4 / nrow(crops.train))
+plot(1:nrow(crops.train), simple_model.cooksd, col = ifelse(simple_model.influential == 1, "red", "black"))
+```
+
+
+```{r}
+# Probably a bad idea just to remove all the influential points like this
+crops.train.no_infl = crops.train[!simple_model.influential,]
+pairs(crops.train.no_infl[, c(vars.con, vars.res)])
+car::vif(lm(Yield ~ ., data = crops.train.no_infl))
+```
+
+```{r}
+
+bc_transform = function(x, lambda) {
+  (x^lambda-1)/lambda
+}
+
+# See https://www.statology.org/box-cox-transformation-in-r/
+
+# Define plotting area
+op <- par(pty = "s", mfrow = c(1, 2))
+
+# Box-cox requires that the response be positive (0 doesn't work), so we add
+# 1 here (just need to remember to subtract 1 when giving actual predictions)
+crops.train.no_infl$Yield = crops.train.no_infl$Yield + 1
+
+simple_model.no_infl = lm(Yield ~ .^2, data = crops.train.no_infl)
+
+qqnorm(simple_model.no_infl$residuals)
+qqline(simple_model.no_infl$residuals)
+
+bc = boxcox(simple_model.no_infl)
+(lambda <- bc$x[which.max(bc$y)])
+
+new_model <- lm(bc_transform(Yield, lambda) ~ .^2, data = crops.train.no_infl)
+
+qqnorm(new_model$residuals)
+qqline(new_model$residuals)
+
+par(op)
+```
+
+```{r}
+pairs(data.frame(crops.train.no_infl[, c(vars.con)], BC_Yield = bc_transform(crops.train.no_infl$Yield, lambda)))
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+# simple_model = lm(Yield ~ .^2, data = crops[-744,])
+# summary(simple_model)
+# plot(predict(simple_model, newdata = crops[-744,]), resid(simple_model))
+# # length(coef(simple_model))
+# 
+# which.max(resid(simple_model))
+# 
+# model.aic.backward = step(simple_model, direction = "backward", trace = 0)
+# summary(model.aic.backward)
+```
+
+```{r}
+# f <- as.formula(Yield ~ .^2)
+# y <- crops$Yield
+# x <- (model.matrix(f, crops))
+# model.lasso.cv = cv.glmnet(x, y, alpha = 1)
+# best_lambda = model.lasso.cv$lambda.min
+# plot(model.lasso.cv)
+# 
+# best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+# coef(best_model)
 ```
 
