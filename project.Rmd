@@ -1,5 +1,5 @@
 ---
-title: "project"
+title: "Predicting Grain Crop Yields in India for Years 1997 - 2020"
 output: html_document
 date: "2023-07-31"
 ---
@@ -16,6 +16,10 @@ library(car)
 library(glmnet)
 library(MASS)
 ```
+
+## Introduction
+
+Below we will explore our ability to predict yields of grain crops in India based on some information about the land in which they were grown on (field size, general region), the type of grain, inputs used (fertilizer, pesticide), and weather (season, rain).  
 
 ```{r message=FALSE}
 crops = read_csv("crop_yield.csv")
@@ -52,10 +56,26 @@ crops$State = as.factor(crops$State)
 
 levels(crops$Crop)
 
-# Drop rows with NA. Probably bad idea to do this
+# Drop rows with NA. We are trading rigor for simplicity here.  
 crops = na.omit(crops)
+```
 
-# Yield is our response
+A quick description of the data, which can be found (here)[https://www.kaggle.com/datasets/akshatgupta7/crop-yield-in-indian-states-dataset].  
+
+Response - Yield: The calculated crop yield (production per unit area)
+
+Predictors
+* Crop: The name of the cultivated crop .  
+* Crop_Year: The year in which the crop was grown.
+* Season: The specific cropping season (e.g., Kharif, Rabi, Whole Year).
+* State: The Indian state where the crop was cultivated.
+* Area: The total land area (in hectares) under cultivation for the specific crop.
+* Production: The quantity of crop production (in metric tons).
+* Annual_Rainfall: The annual rainfall received in the crop-growing region (in mm).
+* Fertilizer: The total amount of fertilizer used for the crop (in kilograms).
+* Pesticide: The total amount of pesticide used for the crop (in kilograms).
+
+```{r}
 kable(
   head(crops, 5)
 )
@@ -118,6 +138,10 @@ vars.con = c("Crop_Year", "Area", "Production", "Annual_Rainfall",
 vars.cat = c("Crop", "Season", "State")
 ```
 
+## Methods
+
+Starting off, we do some exploration of the data, prepare train and test splits, and address problematic data.  
+
 ```{r}
 set.seed(0)
 sample = sample(c(TRUE, FALSE), nrow(crops), replace=TRUE, prob=c(0.8,0.2))
@@ -129,9 +153,15 @@ car::vif(lm(Yield ~ ., data = crops.train))
 ```
 
 
+Next, we create some candidate models
+
 ```{r}
 simple_model = lm(Yield ~ .^2, data = crops.train)
 # summary(simple_model)
+
+# TODO: remove add some other candidates, maybe a full additive as a "control"?
+# TODO: remove It turns out yield = production / area after looking at the data... seems like a good idea to exclude production?
+
 ```
 
 ```{r}
@@ -149,7 +179,7 @@ plot(1:nrow(crops.train), simple_model.cooksd, col = ifelse(simple_model.influen
 
 
 ```{r}
-# Probably a bad idea just to remove all the influential points like this
+# We once again trade rigor for simply removing the influential points
 crops.train.no_infl = crops.train[!simple_model.influential,]
 pairs(crops.train.no_infl[, c(vars.con, vars.res)])
 car::vif(lm(Yield ~ ., data = crops.train.no_infl))
