@@ -17,6 +17,8 @@ date: "2023-07-31"
 # TODO: run inference on test dataset - Mark
 # TODO: Actually write the document - Mark
 # TODO: Create summary information table of models for both training and test datasets - Mark
+
+# todo: Try Crop_Year as both continuous, categorical, and excluded and compare results
 ```
 
 
@@ -153,6 +155,7 @@ crops <- crops[str_squish(tolower(crops$Crop)) %in% str_squish(tolower(grains)),
 crops$Crop <- as.factor(crops$Crop)
 crops$Season <- as.factor(crops$Season)
 crops$State <- as.factor(crops$State)
+crops$Crop_Year = as.factor(crops$Crop_Year)
 
 levels(crops$Crop)
 
@@ -235,8 +238,8 @@ levels(crops$Zone)
 
 ```{r fig.height=5, fig.width=10}
 vars.res <- "Production"
-vars.con <- c("Crop_Year", "Area", "Annual_Rainfall", "Fertilizer", "Pesticide")
-vars.cat <- c("Crop", "Season", "Zone")
+vars.con <- c("Area", "Annual_Rainfall", "Fertilizer", "Pesticide")
+vars.cat <- c("Crop", "Season", "Zone", "Crop_Year")
 ```
 
 ## Methods
@@ -270,10 +273,6 @@ assumptions_plots(baseline)
 plot_cooksd(baseline)
 car::vif(baseline)
 get_loocv_rmse(baseline)
-
-
-# TODO: remove add some other candidates, maybe a full additive as a "control"?
-# TODO: remove It turns out yield = production / area after looking at the data... seems like a good idea to exclude production?
 ```
 
 # Todo: Add code to show the influential point and warrant removal
@@ -319,17 +318,13 @@ shapiro.test(resid(baseline.bc))
 
 ```{r}
 # continuous-categorical interactions
-baseline.poly.form <- as.formula()
-baseline.poly <- lm(
-  Production + 1 ~
-    (poly(Crop_Year, degree = 2, raw = 1) +
-      poly(Area, degree = 2, raw = 1) +
-      poly(Annual_Rainfall, degree = 2, raw = 1) +
-      poly(Fertilizer, degree = 2, raw = 1) +
-      poly(Pesticide, degree = 2, raw = 1)) *
-      (Crop + Season + Zone),
-  data = crops.train
-)
+baseline.poly.form = as.formula(Production + 1 ~ 
+                        (poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1)) *
+                        (Crop + Season + Zone + Crop_Year))
+baseline.poly = lm(baseline.poly.form, data = crops.train)
 summary(baseline.poly)
 plot_fitted_v_actual(baseline.poly)
 assumptions_plots(baseline.poly)
@@ -342,16 +337,7 @@ shapiro.test(resid(baseline.poly))
 ```{r}
 crops.train.poly.no_infl <- remove_infl_pts(baseline.poly, crops.train)
 
-baseline.poly <- lm(
-  Production + 1 ~
-    (poly(Crop_Year, degree = 2, raw = 1) +
-      poly(Area, degree = 2, raw = 1) +
-      poly(Annual_Rainfall, degree = 2, raw = 1) +
-      poly(Fertilizer, degree = 2, raw = 1) +
-      poly(Pesticide, degree = 2, raw = 1)) *
-      (Crop + Season + Zone),
-  data = crops.train.poly.no_infl
-)
+baseline.poly = lm(baseline.poly.form, data = crops.train.poly.no_infl)
 summary(baseline.poly)
 plot_fitted_v_actual(baseline.poly)
 assumptions_plots(baseline.poly)
@@ -365,16 +351,11 @@ shapiro.test(resid(baseline.poly))
 bc <- boxcox(baseline.poly)
 (lambda <- bc$x[which.max(bc$y)])
 
-baseline.poly.bc <- lm(
-  bc_transform(Production + 1, lambda) ~
-    (poly(Crop_Year, 2, raw = 1) +
-      poly(Area, 2, raw = 1) +
-      poly(Annual_Rainfall, 2, raw = 1) +
-      poly(Fertilizer, 2, raw = 1) +
-      poly(Pesticide, 2, raw = 1)) *
-      (Crop + Season + Zone),
-  data = crops.train.poly.no_infl
-)
+baseline.poly.bc = lm(paste("bc_transform(Production + 1, lambda) ~ ", 
+                             paste(attr(terms(baseline.poly.form), 
+                                        which = "term.labels"), 
+                                   collapse = " + ")),
+                        data = crops.train.poly.no_infl)
 
 summary(baseline.poly.bc)
 plot_fitted_v_actual(baseline.poly.bc)
@@ -387,26 +368,21 @@ shapiro.test(resid(baseline.poly.bc))
 
 ***
 ```{r}
-baseline.multi <- lm(
-  Production + 1 ~
-    (poly(Crop_Year, degree = 2, raw = 1) +
-      poly(Area, degree = 2, raw = 1) +
-      poly(Annual_Rainfall, degree = 2, raw = 1) +
-      poly(Fertilizer, degree = 2, raw = 1) +
-      poly(Pesticide, degree = 2, raw = 1) +
-      I(sqrt(Crop_Year)) +
-      I(sqrt(Area)) +
-      I(sqrt(Annual_Rainfall)) +
-      I(sqrt(Fertilizer)) +
-      I(sqrt(Pesticide)) +
-      I(log(Crop_Year)) +
-      I(log(Area)) +
-      I(log(Annual_Rainfall)) +
-      I(log(Fertilizer)) +
-      I(log(Pesticide))) *
-      (Crop + Season + Zone),
-  data = crops.train
-)
+baseline.multi.form = as.formula(Production + 1 ~ 
+                        (poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        I(sqrt(Area)) +
+                        I(sqrt(Annual_Rainfall)) +
+                        I(sqrt(Fertilizer)) +
+                        I(sqrt(Pesticide)) +
+                        I(log(Area)) +
+                        I(log(Annual_Rainfall)) +
+                        I(log(Fertilizer)) +
+                        I(log(Pesticide))) *
+                        (Crop + Season + Zone + Crop_Year))
+baseline.multi = lm(baseline.multi.form, data = crops.train)
 summary(baseline.multi)
 plot_fitted_v_actual(baseline.multi)
 assumptions_plots(baseline.multi)
@@ -417,28 +393,12 @@ shapiro.test(resid(baseline.multi))
 ```
 
 ```{r}
+# TODO: I've removed all the influential points here. We may not want to do that.
+# In which case, we can remove this cell and use the model from the previous cell
+# to do the box-cox transformation in the following cell.
 crops.train.multi.no_infl <- remove_infl_pts(baseline.multi, crops.train)
 
-baseline.multi <- lm(
-  Production + 1 ~
-    (poly(Crop_Year, degree = 2, raw = 1) +
-      poly(Area, degree = 2, raw = 1) +
-      poly(Annual_Rainfall, degree = 2, raw = 1) +
-      poly(Fertilizer, degree = 2, raw = 1) +
-      poly(Pesticide, degree = 2, raw = 1) +
-      I(sqrt(Crop_Year)) +
-      I(sqrt(Area)) +
-      I(sqrt(Annual_Rainfall)) +
-      I(sqrt(Fertilizer)) +
-      I(sqrt(Pesticide)) +
-      I(log(Crop_Year)) +
-      I(log(Area)) +
-      I(log(Annual_Rainfall)) +
-      I(log(Fertilizer)) +
-      I(log(Pesticide))) *
-      (Crop + Season + Zone),
-  data = crops.train.multi.no_infl
-)
+baseline.multi = lm(baseline.multi.form, data = crops.train.multi.no_infl)
 summary(baseline.multi)
 plot_fitted_v_actual(baseline.multi)
 assumptions_plots(baseline.multi)
@@ -452,26 +412,11 @@ shapiro.test(resid(baseline.multi))
 bc <- boxcox(baseline.multi)
 (lambda <- bc$x[which.max(bc$y)])
 
-baseline.multi.bc <- lm(
-  bc_transform(Production + 1, lambda) ~
-    (poly(Crop_Year, degree = 2, raw = 1) +
-      poly(Area, degree = 2, raw = 1) +
-      poly(Annual_Rainfall, degree = 2, raw = 1) +
-      poly(Fertilizer, degree = 2, raw = 1) +
-      poly(Pesticide, degree = 2, raw = 1) +
-      I(sqrt(Crop_Year)) +
-      I(sqrt(Area)) +
-      I(sqrt(Annual_Rainfall)) +
-      I(sqrt(Fertilizer)) +
-      I(sqrt(Pesticide)) +
-      I(log(Crop_Year)) +
-      I(log(Area)) +
-      I(log(Annual_Rainfall)) +
-      I(log(Fertilizer)) +
-      I(log(Pesticide))) *
-      (Crop + Season + Zone),
-  data = crops.train.multi.no_infl
-)
+baseline.multi.bc = lm(paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(baseline.multi.form),
+                                        which = "term.labels"),
+                                   collapse = " + ")),
+                        data = crops.train.multi.no_infl)
 
 summary(baseline.multi.bc)
 plot_fitted_v_actual(baseline.multi.bc)
@@ -482,10 +427,11 @@ bptest(baseline.multi.bc)
 shapiro.test(resid(baseline.multi.bc))
 ```
 
+
 ***
 
 ```{r}
-model.aic.backward <- step(baseline.poly.bc, direction = "backward", trace = 0)
+model.aic.backward <- step(baseline.multi.bc, direction = "backward", trace = 0)
 summary(model.aic.backward)
 plot_fitted_v_actual(model.aic.backward)
 assumptions_plots(model.aic.backward)
@@ -496,7 +442,7 @@ shapiro.test(resid(model.aic.backward))
 ```
 
 ```{r}
-model.bic.backward <- step(baseline.poly.bc,
+model.bic.backward <- step(baseline.multi.bc,
   direction = "backward", trace = 0,
   k = log(nrow(crops.train.poly.no_infl))
 )
@@ -511,13 +457,10 @@ shapiro.test(resid(model.bic.backward))
 
 
 ```{r}
-f <- as.formula(bc_transform(Production + 1, lambda) ~
-  (poly(Crop_Year, degree = 3, raw = 1) +
-    poly(Area, degree = 3, raw = 1) +
-    poly(Annual_Rainfall, degree = 3, raw = 1) +
-    poly(Fertilizer, degree = 3, raw = 1) +
-    poly(Pesticide, degree = 3, raw = 1)) *
-    (Crop + Season + Zone))
+f <- as.formula(paste("bc_transform(Production + 1, lambda) ~ ",
+           paste(attr(terms(baseline.multi.form),
+                      which = "term.labels"),
+                 collapse = " + ")))
 y <- crops$Production
 x <- (model.matrix(f, crops))
 model.lasso.cv <- cv.glmnet(x, y, alpha = 1, parallel = 1)
@@ -536,7 +479,4 @@ extract.coef(model.lasso.cv)
 # get_loocv_rmse(best_model)
 # bptest(best_model)
 # shapiro.test(resid(best_model))
-```
-
-```{r}
 ```
