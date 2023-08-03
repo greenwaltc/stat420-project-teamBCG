@@ -297,13 +297,15 @@ bptest(baseline.bc)
 shapiro.test(resid(baseline.bc))
 ```
 
+***
+
 ```{r}
 baseline.poly = lm(Production + 1 ~ 
-                        (poly(Crop_Year, degree = 3, raw = 1) +
-                        poly(Area, degree = 3, raw = 1) +
-                        poly(Annual_Rainfall, degree = 3, raw = 1) +
-                        poly(Fertilizer, degree = 3, raw = 1) +
-                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (poly(Crop_Year, degree = 2, raw = 1) +
+                        poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1)) *
                         (Crop + Season + Zone),
                         data = crops.train)
 summary(baseline.poly)
@@ -320,11 +322,11 @@ shapiro.test(resid(baseline.poly))
 crops.train.poly.no_infl = remove_infl_pts(baseline.poly, crops.train)
 
 baseline.poly = lm(Production + 1 ~ 
-                        (poly(Crop_Year, degree = 3, raw = 1) +
-                        poly(Area, degree = 3, raw = 1) +
-                        poly(Annual_Rainfall, degree = 3, raw = 1) +
-                        poly(Fertilizer, degree = 3, raw = 1) +
-                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (poly(Crop_Year, degree = 2, raw = 1) +
+                        poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1)) *
                         (Crop + Season + Zone),
                         data = crops.train.poly.no_infl)
 summary(baseline.poly)
@@ -342,11 +344,11 @@ bc = boxcox(baseline.poly)
 (lambda <- bc$x[which.max(bc$y)])
 
 baseline.poly.bc = lm(bc_transform(Production + 1, lambda) ~ 
-                        (poly(Crop_Year, degree = 3, raw = 1) +
-                        poly(Area, degree = 3, raw = 1) +
-                        poly(Annual_Rainfall, degree = 3, raw = 1) +
-                        poly(Fertilizer, degree = 3, raw = 1) +
-                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (poly(Crop_Year, 2, raw = 1) +
+                        poly(Area, 2, raw = 1) +
+                        poly(Annual_Rainfall, 2, raw = 1) +
+                        poly(Fertilizer, 2, raw = 1) +
+                        poly(Pesticide, 2, raw = 1)) *
                         (Crop + Season + Zone),
                         data = crops.train.poly.no_infl)
 
@@ -360,18 +362,127 @@ bptest(baseline.poly.bc)
 shapiro.test(resid(baseline.poly.bc))
 ```
 
+***
+```{r}
+baseline.multi = lm(Production + 1 ~ 
+                        (poly(Crop_Year, degree = 2, raw = 1) +
+                        poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        I(sqrt(Crop_Year)) +
+                        I(sqrt(Area)) +
+                        I(sqrt(Annual_Rainfall)) +
+                        I(sqrt(Fertilizer)) +
+                        I(sqrt(Pesticide)) +
+                        I(log(Crop_Year)) +
+                        I(log(Area)) +
+                        I(log(Annual_Rainfall)) +
+                        I(log(Fertilizer)) +
+                        I(log(Pesticide))) *
+                        (Crop + Season + Zone),
+                        data = crops.train)
+summary(baseline.multi)
+plot_fitted_v_actual(baseline.multi)
+assumptions_plots(baseline.multi)
+plot_cooksd(baseline.multi)
+# car::vif(baseline.multi)
+get_loocv_rmse(baseline.multi)
+bptest(baseline.multi)
+shapiro.test(resid(baseline.multi))
+```
 
 ```{r}
-# simple_model = lm(Yield ~ .^2, data = crops[-744,])
-# summary(simple_model)
-# plot(predict(simple_model, newdata = crops[-744,]), resid(simple_model))
-# # length(coef(simple_model))
-# 
-# which.max(resid(simple_model))
-# 
-# model.aic.backward = step(simple_model, direction = "backward", trace = 0)
-# summary(model.aic.backward)
+crops.train.multi.no_infl = remove_infl_pts(baseline.multi, crops.train)
+
+baseline.multi = lm(Production + 1 ~ 
+                        (poly(Crop_Year, degree = 2, raw = 1) +
+                        poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        I(sqrt(Crop_Year)) +
+                        I(sqrt(Area)) +
+                        I(sqrt(Annual_Rainfall)) +
+                        I(sqrt(Fertilizer)) +
+                        I(sqrt(Pesticide)) +
+                        I(log(Crop_Year)) +
+                        I(log(Area)) +
+                        I(log(Annual_Rainfall)) +
+                        I(log(Fertilizer)) +
+                        I(log(Pesticide))) *
+                        (Crop + Season + Zone),
+                        data = crops.train.multi.no_infl)
+summary(baseline.multi)
+plot_fitted_v_actual(baseline.multi)
+assumptions_plots(baseline.multi)
+plot_cooksd(baseline.multi)
+# car::vif(baseline.multi)
+get_loocv_rmse(baseline.multi)
+bptest(baseline.multi)
+shapiro.test(resid(baseline.multi))
 ```
+
+```{r}
+bc = boxcox(baseline.multi)
+(lambda <- bc$x[which.max(bc$y)])
+
+baseline.multi.bc = lm(bc_transform(Production + 1, lambda) ~ 
+                        (poly(Crop_Year, degree = 2, raw = 1) +
+                        poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        I(sqrt(Crop_Year)) +
+                        I(sqrt(Area)) +
+                        I(sqrt(Annual_Rainfall)) +
+                        I(sqrt(Fertilizer)) +
+                        I(sqrt(Pesticide)) +
+                        I(log(Crop_Year)) +
+                        I(log(Area)) +
+                        I(log(Annual_Rainfall)) +
+                        I(log(Fertilizer)) +
+                        I(log(Pesticide))) *
+                        (Crop + Season + Zone),
+                        data = crops.train.multi.no_infl)
+
+summary(baseline.multi.bc)
+plot_fitted_v_actual(baseline.multi.bc)
+assumptions_plots(baseline.multi.bc)
+plot_cooksd(baseline.multi.bc)
+# car::vif(baseline.multi.bc)
+get_loocv_rmse(baseline.multi.bc)
+bptest(baseline.multi.bc)
+shapiro.test(resid(baseline.multi.bc))
+```
+
+***
+
+```{r}
+model.aic.backward = step(baseline.poly.bc, direction = "backward", trace = 0)
+summary(model.aic.backward)
+plot_fitted_v_actual(model.aic.backward)
+assumptions_plots(model.aic.backward)
+plot_cooksd(model.aic.backward)
+# car::vif(model.aic.backward)
+get_loocv_rmse(model.aic.backward)
+bptest(model.aic.backward)
+shapiro.test(resid(model.aic.backward))
+```
+
+```{r}
+model.bic.backward = step(baseline.poly.bc, direction = "backward", trace = 0, 
+                          k = log(nrow(crops.train.poly.no_infl)))
+summary(model.bic.backward)
+plot_fitted_v_actual(model.bic.backward)
+assumptions_plots(model.bic.backward)
+plot_cooksd(model.bic.backward)
+# car::vif(model.bic.backward)
+get_loocv_rmse(model.bic.backward)
+bptest(model.bic.backward)
+shapiro.test(resid(model.bic.backward))
+```
+
 
 ```{r}
 f <- as.formula(bc_transform(Production + 1, lambda) ~ 
@@ -383,7 +494,7 @@ f <- as.formula(bc_transform(Production + 1, lambda) ~
                         (Crop + Season + Zone))
 y <- crops$Production
 x <- (model.matrix(f, crops))
-model.lasso.cv = cv.glmnet(x, y, alpha = 1)
+model.lasso.cv = cv.glmnet(x, y, alpha = 1, parallel = 1)
 best_lambda = model.lasso.cv$lambda.min
 plot(model.lasso.cv)
 
@@ -398,5 +509,6 @@ plot_cooksd(best_model)
 get_loocv_rmse(best_model)
 bptest(best_model)
 shapiro.test(resid(best_model))
+best_model.
 ```
 
