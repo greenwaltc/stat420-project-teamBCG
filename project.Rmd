@@ -4,6 +4,22 @@ output: html_document
 date: "2023-07-31"
 ---
 
+```{r}
+# TODO: Write function to output all model diagnostics and plots - Ben
+
+#   summary(model)
+#   plot_fitted_v_actual(model)
+#   assumptions_plots(model)
+#   plot_cooksd(model)
+#   car::vif(model) ?? maybe
+
+# TODO: Run CV validation of models - Ben
+# TODO: run inference on test dataset - Mark
+# TODO: Actually write the document - Mark
+# TODO: Create summary information table of models for both training and test datasets - Mark
+```
+
+
 ---
 # Helper functions
 
@@ -52,7 +68,6 @@ plot_cooksd = function(model) {
        main = "Cook's Distances")
   abline(h = 4 / n,
          col = "royalblue")
-  # text(x = 10, y = (4/n), "4/n cutoff")
 }
 
 bc_transform = function(x, lambda) {
@@ -271,7 +286,6 @@ summary(baseline.no_infl)
 plot_fitted_v_actual(baseline.no_infl)
 assumptions_plots(baseline.no_infl)
 plot_cooksd(baseline.no_infl)
-# car::vif(baseline.no_infl)
 get_loocv_rmse(baseline.no_infl)
 ```
 
@@ -302,6 +316,7 @@ shapiro.test(resid(baseline.bc))
 
 ```{r}
 # continuous-categorical interactions
+baseline.poly.form = as.formula()
 baseline.poly = lm(Production + 1 ~ 
                         (poly(Crop_Year, degree = 2, raw = 1) +
                         poly(Area, degree = 2, raw = 1) +
@@ -314,7 +329,6 @@ summary(baseline.poly)
 plot_fitted_v_actual(baseline.poly)
 assumptions_plots(baseline.poly)
 plot_cooksd(baseline.poly)
-# car::vif(baseline.poly)
 get_loocv_rmse(baseline.poly)
 bptest(baseline.poly)
 shapiro.test(resid(baseline.poly))
@@ -335,7 +349,6 @@ summary(baseline.poly)
 plot_fitted_v_actual(baseline.poly)
 assumptions_plots(baseline.poly)
 plot_cooksd(baseline.poly)
-# car::vif(baseline.poly)
 get_loocv_rmse(baseline.poly)
 bptest(baseline.poly)
 shapiro.test(resid(baseline.poly))
@@ -358,7 +371,6 @@ summary(baseline.poly.bc)
 plot_fitted_v_actual(baseline.poly.bc)
 assumptions_plots(baseline.poly.bc)
 plot_cooksd(baseline.poly.bc)
-# car::vif(baseline.poly.bc)
 get_loocv_rmse(baseline.poly.bc)
 bptest(baseline.poly.bc)
 shapiro.test(resid(baseline.poly.bc))
@@ -388,7 +400,6 @@ summary(baseline.multi)
 plot_fitted_v_actual(baseline.multi)
 assumptions_plots(baseline.multi)
 plot_cooksd(baseline.multi)
-# car::vif(baseline.multi)
 get_loocv_rmse(baseline.multi)
 bptest(baseline.multi)
 shapiro.test(resid(baseline.multi))
@@ -419,7 +430,6 @@ summary(baseline.multi)
 plot_fitted_v_actual(baseline.multi)
 assumptions_plots(baseline.multi)
 plot_cooksd(baseline.multi)
-# car::vif(baseline.multi)
 get_loocv_rmse(baseline.multi)
 bptest(baseline.multi)
 shapiro.test(resid(baseline.multi))
@@ -452,7 +462,6 @@ summary(baseline.multi.bc)
 plot_fitted_v_actual(baseline.multi.bc)
 assumptions_plots(baseline.multi.bc)
 plot_cooksd(baseline.multi.bc)
-# car::vif(baseline.multi.bc)
 get_loocv_rmse(baseline.multi.bc)
 bptest(baseline.multi.bc)
 shapiro.test(resid(baseline.multi.bc))
@@ -466,7 +475,6 @@ summary(model.aic.backward)
 plot_fitted_v_actual(model.aic.backward)
 assumptions_plots(model.aic.backward)
 plot_cooksd(model.aic.backward)
-# car::vif(model.aic.backward)
 get_loocv_rmse(model.aic.backward)
 bptest(model.aic.backward)
 shapiro.test(resid(model.aic.backward))
@@ -479,7 +487,6 @@ summary(model.bic.backward)
 plot_fitted_v_actual(model.bic.backward)
 assumptions_plots(model.bic.backward)
 plot_cooksd(model.bic.backward)
-# car::vif(model.bic.backward)
 get_loocv_rmse(model.bic.backward)
 bptest(model.bic.backward)
 shapiro.test(resid(model.bic.backward))
@@ -509,7 +516,6 @@ extract.coef(model.lasso.cv)
 # plot_fitted_v_actual(best_model)
 # assumptions_plots(best_model)
 # plot_cooksd(best_model)
-# # car::vif(best_model)
 # get_loocv_rmse(best_model)
 # bptest(best_model)
 # shapiro.test(resid(best_model))
