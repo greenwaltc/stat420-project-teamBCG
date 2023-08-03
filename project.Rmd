@@ -8,13 +8,6 @@ author: "Team BCG: Cameron Greenwalt, Mark Bauer, Ben Carman"
 ---- 
 
 ```{r}
-# TODO: Write function to output all model diagnostics and plots - Ben
-#   summary(model)
-#   plot_fitted_v_actual(model)
-#   assumptions_plots(model)
-#   plot_cooksd(model)
-#   car::vif(model) ?? maybe
-# TODO: Run CV validation of models - Ben
 # TODO: run inference on test dataset - Mark
 # TODO: Actually write the document - Mark
 # TODO: Create summary information table of models for both training and test datasets - Mark
@@ -439,4 +432,30 @@ best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
 predict(best_model, newx = x)
 bc_transform(crops.train.multi.no_infl$Production + 1, lambda)
 ```
+
+## Results
+
+Here we summarize results for the following models explored above:
+
+### TODO: Double check models/names used in this section, add models for other ways of representing "Year" in model
+```{r}
+models = list(baseline.multi, baseline.multi.bc, model.aic.backward, model.bic.backward)
+modelNames = c("baseline.multi", "baseline.multi.bc", "model.aic.backward", "model.bic.backward")
+```
+
+To begin, we will assess each model's test performance using LOOCV-RMSE:
+
+```{r}
+loocv_rmses = rep(0,length(models))
+for (i in 1:length(models)) {
+  loocv_rmses[i] = get_loocv_rmse(models[[i]])
+}
+
+kable(data.frame("Model" = modelNames, "LOOCV-RMSE" = loocv_rmses))
+```
+
+
+
+
+
 
