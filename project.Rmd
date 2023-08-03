@@ -411,7 +411,7 @@ output_diagnostics(model.aic.backward, vif = 0)
 ```{r}
 model.bic.backward <- step(baseline.multi.bc,
   direction = "backward", trace = 0,
-  k = log(nrow(crops.train.poly.no_infl))
+  k = log(nrow(crops.train.multi.no_infl))
 )
 output_diagnostics(model.bic.backward, vif = 0)
 ```
@@ -422,25 +422,21 @@ f <- as.formula(paste("bc_transform(Production + 1, lambda) ~ ",
            paste(attr(terms(baseline.multi.form),
                       which = "term.labels"),
                  collapse = " + ")))
-y <- crops$Production
-x <- (model.matrix(f, crops))
+y <- crops.train.multi.no_infl$Production
+x <- (model.matrix(f, crops.train.multi.no_infl))
 model.lasso.cv <- cv.glmnet(x, y, alpha = 1, parallel = 1)
 best_lambda <- model.lasso.cv$lambda.min
 plot(model.lasso.cv)
 
 best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
-coef(best_model)
+# coef(best_model)
 
-extract.coef(model.lasso.cv)
-
-# summary(best_model)
-# plot_fitted_v_actual(best_model)
-# assumptions_plots(best_model)
-# plot_cooksd(best_model)
-# get_loocv_rmse(best_model)
-# bptest(best_model)
-# shapiro.test(resid(best_model))
+# extract.coef(model.lasso.cv)
+(names = rownames(coef(best_model, s = 'lambda.min'))[coef(best_model, s = 'lambda.min')[,1]!= 0]) ### returns nonzero coefs
 ```
 
 ```{r}
+predict(best_model, newx = x)
+bc_transform(crops.train.multi.no_infl$Production + 1, lambda)
 ```
+
