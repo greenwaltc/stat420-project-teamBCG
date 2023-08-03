@@ -256,7 +256,7 @@ summary(baseline.no_infl)
 plot_fitted_v_actual(baseline.no_infl)
 assumptions_plots(baseline.no_infl)
 plot_cooksd(baseline.no_infl)
-car::vif(baseline.no_infl)
+# car::vif(baseline.no_infl)
 get_loocv_rmse(baseline.no_infl)
 ```
 
