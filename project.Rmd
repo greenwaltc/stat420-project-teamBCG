@@ -81,9 +81,8 @@ get_adj_r2 <- function(model) {
   summary(model)$adj.r.squared
 }
 
-remove_infl_pts <- function(model, data) {
-  infl_pt_idx <- cooks.distance(baseline) > 4 / nrow(crops.train)
-  data[-infl_pt_idx, ]
+idx_infl_pts <- function(model) {
+  cooks.distance(model) > (4 / length(resid(model)))
 }
 
 output_diagnostics = function(model, vif = TRUE) {
@@ -334,7 +333,7 @@ output_diagnostics(baseline.poly, vif = 0)
 ```
 
 ```{r}
-crops.train.poly.no_infl <- remove_infl_pts(baseline.poly, crops.train)
+crops.train.poly.no_infl <- crops.train[!idx_infl_pts(baseline.poly),]
 
 baseline.poly = lm(baseline.poly.form, data = crops.train.poly.no_infl)
 output_diagnostics(baseline.poly, vif = 0)
@@ -354,7 +353,7 @@ output_diagnostics(baseline.poly.bc, vif = 0)
 
 ***
 ```{r}
-baseline.multi.form = as.formula(Production + 1 ~ 
+multi.form = as.formula(Production + 1 ~ 
                         (poly(Area, degree = 2, raw = 1) +
                         poly(Annual_Rainfall, degree = 2, raw = 1) +
                         poly(Fertilizer, degree = 2, raw = 1) +
@@ -368,69 +367,58 @@ baseline.multi.form = as.formula(Production + 1 ~
                         I(log(Fertilizer)) +
                         I(log(Pesticide))) *
                         (Crop + Season + Zone + Crop_Year))
-baseline.multi = lm(baseline.multi.form, data = crops.train)
-output_diagnostics(baseline.multi, vif = FALSE)
+multi.full = lm(multi.form, data = crops.train)
+output_diagnostics(multi.full, vif = FALSE)
 ```
 
 ```{r}
 # TODO: I've removed all the influential points here. We may not want to do that.
 # In which case, we can remove this cell and use the model from the previous cell
 # to do the box-cox transformation in the following cell.
-crops.train.multi.no_infl <- remove_infl_pts(baseline.multi, crops.train)
+crops.train.multi.no_infl <- crops.train[!idx_infl_pts(multi.full),]
 
-baseline.multi = lm(baseline.multi.form, data = crops.train.multi.no_infl)
-output_diagnostics(baseline.multi, vif = FALSE)
+multi.full = lm(multi.form, data = crops.train.multi.no_infl)
+output_diagnostics(multi.full, vif = FALSE)
 ```
 
 ```{r}
-bc <- boxcox(baseline.multi)
+bc <- boxcox(multi.full)
 (lambda <- bc$x[which.max(bc$y)])
 
-baseline.multi.bc = lm(paste("bc_transform(Production + 1, lambda) ~ ",
-                             paste(attr(terms(baseline.multi.form),
+multi.full.bc = lm(paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form),
                                         which = "term.labels"),
                                    collapse = " + ")),
                         data = crops.train.multi.no_infl)
-output_diagnostics(baseline.multi.bc, vif = FALSE)
+output_diagnostics(multi.full.bc, vif = FALSE)
 ```
 
 ***
 
 ```{r}
-model.aic.backward <- step(baseline.multi.bc, direction = "backward", trace = 0)
-output_diagnostics(model.aic.backward, vif = 0)
+# multi.aic.backward.bc <- step(multi.full.bc, direction = "backward", trace = 0)
+# output_diagnostics(multi.aic.backward.bc, vif = 0)
 ```
 
 ```{r}
-model.bic.backward <- step(baseline.multi.bc,
-  direction = "backward", trace = 0,
+# multi.bic.backward.bc <- step(multi.full.bc,
+#   direction = "backward", trace = 0,
+#   k = log(nrow(crops.train.multi.no_infl))
+# )
+# output_diagnostics(multi.bic.backward.bc, vif = 0)
+```
+
+```{r}
+multi.aic.forward.bc <- step(multi.full.bc, direction = "forward", trace = 0)
+output_diagnostics(multi.aic.forward.bc, vif = 0)
+```
+
+```{r}
+multi.bic.forward.bc <- step(multi.full.bc,
+  direction = "forward", trace = 0,
   k = log(nrow(crops.train.multi.no_infl))
 )
-output_diagnostics(model.bic.backward, vif = 0)
-```
-
-
-```{r}
-f <- as.formula(paste("bc_transform(Production + 1, lambda) ~ ",
-           paste(attr(terms(baseline.multi.form),
-                      which = "term.labels"),
-                 collapse = " + ")))
-y <- crops.train.multi.no_infl$Production
-x <- (model.matrix(f, crops.train.multi.no_infl))
-model.lasso.cv <- cv.glmnet(x, y, alpha = 1, parallel = 1)
-best_lambda <- model.lasso.cv$lambda.min
-plot(model.lasso.cv)
-
-best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
-# coef(best_model)
-
-# extract.coef(model.lasso.cv)
-(names = rownames(coef(best_model, s = 'lambda.min'))[coef(best_model, s = 'lambda.min')[,1]!= 0]) ### returns nonzero coefs
-```
-
-```{r}
-predict(best_model, newx = x)
-bc_transform(crops.train.multi.no_infl$Production + 1, lambda)
+output_diagnostics(multi.bic.forward.bc, vif = 0)
 ```
 
 ## Results
@@ -439,19 +427,35 @@ Here we summarize results for the following models explored above:
 
 ### TODO: Double check models/names used in this section, add models for other ways of representing "Year" in model
 ```{r}
-models = list(baseline.multi, baseline.multi.bc, model.aic.backward, model.bic.backward)
-modelNames = c("baseline.multi", "baseline.multi.bc", "model.aic.backward", "model.bic.backward")
+models = list(multi.full, multi.full.bc, multi.aic.backward.bc, 
+               multi.bic.backward.bc, multi.aic.forward.bc,
+               multi.bic.forward.bc)
+modelNames = c("multi.full", "multi.full.bc", "multi.aic.backward.bc", 
+               "multi.bic.backward.bc", "multi.aic.forward.bc",
+               "multi.bic.forward.bc")
 ```
 
 To begin, we will assess each model's test performance using LOOCV-RMSE:
 
 ```{r}
 loocv_rmses = rep(0,length(models))
+train_rmses = rep(0,length(models))
+test_rmses = rep(0,length(models))
+train_adjr2 = rep(0,length(models))
 for (i in 1:length(models)) {
   loocv_rmses[i] = get_loocv_rmse(models[[i]])
+  train_rmses[i] = sqrt(mean(resid(models[[i]])^2))
+  test_rmses[i] = sqrt(
+    mean(
+      (crops.test$Production - predict(models[[i]], newdata = crops.test))^2
+    )
+  )
+  train_adjr2[i] = summary(models[[i]])$adj.r.squared
 }
 
-kable(data.frame("Model" = modelNames, "LOOCV-RMSE" = loocv_rmses))
+kable(data.frame("Model" = modelNames, "LOOCV-RMSE" = loocv_rmses,
+                 "Train RMSE" = train_rmses, "Test RMSE" = test_rmses,
+                 "Train Adj R-Squared" = train_adjr2))
 ```
 
 
