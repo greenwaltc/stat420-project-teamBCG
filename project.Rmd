@@ -218,9 +218,15 @@ Starting off, we do some exploration of the data, prepare train and test splits,
 
 ```{r}
 set.seed(0)
+
+nrow(crops)
+
 sample = sample(c(TRUE, FALSE), nrow(crops), replace=TRUE, prob=c(0.8,0.2))
 crops.train = crops[sample, ]
 crops.test = crops[!sample, ]
+
+nrow(crops.train)
+nrow(crops.test)
 ```
 
 ```{r}
@@ -243,6 +249,8 @@ get_loocv_rmse(baseline)
 # TODO: remove It turns out yield = production / area after looking at the data... seems like a good idea to exclude production?
 
 ```
+
+# Todo: Add code to show the influential point and warrant removal
 
 Remove that one super influential point
 
@@ -281,16 +289,6 @@ assumptions_plots(baseline.bc)
 
 par(op)
 ```
-
-```{r}
-pairs(data.frame(crops.train.no_infl[, c(vars.con)], BC_Yield = bc_transform(crops.train.no_infl$Yield, lambda)))
-```
-
-
-```{r}
-
-```
-
 
 ```{r}
 # simple_model = lm(Yield ~ .^2, data = crops[-744,])
