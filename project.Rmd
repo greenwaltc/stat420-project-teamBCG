@@ -2,17 +2,12 @@
 title: "Predicting Grain Crop Yields in India for Years 1997 - 2020"
 output: html_document
 date: "2023-07-31"
+author: "Team BCG: Cameron Greenwalt, Mark Bauer, Ben Carman"
 ---
 
+---- 
+
 ```{r}
-# TODO: Write function to output all model diagnostics and plots - Ben
-
-#   summary(model)
-#   plot_fitted_v_actual(model)
-#   assumptions_plots(model)
-#   plot_cooksd(model)
-#   car::vif(model) ?? maybe
-
 # TODO: Run CV validation of models - Ben
 # TODO: run inference on test dataset - Mark
 # TODO: Actually write the document - Mark
@@ -20,7 +15,6 @@ date: "2023-07-31"
 ```
 
 
----
 # Helper functions
 
 ```{r}
@@ -91,6 +85,24 @@ remove_infl_pts <- function(model, data) {
   infl_pt_idx <- cooks.distance(baseline) > 4 / nrow(crops.train)
   data[-infl_pt_idx, ]
 }
+
+output_diagnostics = function(model, vif = TRUE) {
+  if (length(coef(model)) < 30) {
+    print("Model Summary:")
+    print(summary(model))
+  }
+  plot_fitted_v_actual(model)
+  assumptions_plots(model)
+  plot_cooksd(model)
+  bptest(model)
+  shapiro.test(resid(model))
+  
+  print(c("LOOCV-RMSE:", get_loocv_rmse(model)))
+  
+  if (vif) {
+    car::vif(model)
+  }
+}
 ```
 
 ---
@@ -112,19 +124,34 @@ library(coefplot)
 
 ## Introduction
 
-Below we will explore our ability to predict yields of grain crops in India based on some information about the land in which they were grown on (field size, general region), the type of grain, inputs used (fertilizer, pesticide), and weather (season, rain).  
+In this project we will explore our ability to predict yields of grain crops in India based on some information about the land in which they were grown on (field size, general region), the type of grain, inputs used (fertilizer, pesticide), and weather (season, rain). 
 
 ```{r message=FALSE}
 crops <- read_csv("crop_yield.csv")
 ```
 
-It turns out that original intended response, `Yield`, is a metric derived by computing `Production / Area`. It would be incorrect for us to include `Production` and `Area` as predictors in a model whose response is `Yield`. Instead, we will remove `Yield` and use the remaining variables to predict `Production`.
+Here we provide a summary or the data, which can be found (here)[https://www.kaggle.com/datasets/akshatgupta7/crop-yield-in-indian-states-dataset].  
+
+Response - Production: The quantity of crop production (in metric tons).
+
+Predictors
+
+- Crop: The name of the cultivated crop .  
+- Crop_Year: The year in which the crop was grown.
+- Season: The specific cropping season (e.g., Kharif, Rabi, Whole Year).
+- State: The Indian state where the crop was cultivated.
+- Area: The total land area (in hectares) under cultivation for the specific crop.
+- Annual_Rainfall: The annual rainfall received in the crop-growing region (in mm).
+- Fertilizer: The total amount of fertilizer used for the crop (in kilograms).
+- Pesticide: The total amount of pesticide used for the crop (in kilograms).
+
+It turns our original intended response, `Yield`, is a metric derived by computing `Production / Area`. It would be incorrect for us to include `Production` and `Area` as predictors in a model whose response is `Yield`. Instead, we remove `Yield` and use the remaining variables to predict `Production`.
 
 ```{r}
 crops <- crops[, !(names(crops) %in% c("Yield"))]
 ```
 
-
+In order to limit scope, we also limit the types of crops under observation to a subset of grains (e.g., wheat, barley, rye, etc.). We also convert categorical variables to factor variables as appropriate.
 
 ```{r message=FALSE, warning=FALSE}
 grains <- c(
@@ -147,33 +174,18 @@ grains <- c(
   "Corn Starch", "Wheat nuts", "Other Cereals"
 )
 
-# Other grain types may be added later
+# Drop non-grain rows
 crops <- crops[str_squish(tolower(crops$Crop)) %in% str_squish(tolower(grains)), ]
 
+# Convert categorical variables to factor variables
 crops$Crop <- as.factor(crops$Crop)
 crops$Season <- as.factor(crops$Season)
 crops$State <- as.factor(crops$State)
 
 levels(crops$Crop)
-
-# Drop rows with NA. We are trading rigor for simplicity here.
-crops <- na.omit(crops)
 ```
 
-A quick description of the data, which can be found (here)[https://www.kaggle.com/datasets/akshatgupta7/crop-yield-in-indian-states-dataset].  
-
-Response - Yield: The calculated crop yield (production per unit area)
-
-Predictors
-* Crop: The name of the cultivated crop .  
-* Crop_Year: The year in which the crop was grown.
-* Season: The specific cropping season (e.g., Kharif, Rabi, Whole Year).
-* State: The Indian state where the crop was cultivated.
-* Area: The total land area (in hectares) under cultivation for the specific crop.
-* Production: The quantity of crop production (in metric tons).
-* Annual_Rainfall: The annual rainfall received in the crop-growing region (in mm).
-* Fertilizer: The total amount of fertilizer used for the crop (in kilograms).
-* Pesticide: The total amount of pesticide used for the crop (in kilograms).
+Here we present a few rows from the cleaned and pared down dataset:
 
 ```{r}
 kable(
@@ -181,13 +193,21 @@ kable(
 )
 ```
 
+As we prepare the dataset for modeling, we also explore the remaining factor variables:
+
 ```{r}
 levels(crops$Season)
 ```
 
+The season column appears reasonable. Let's also check the values for State:
+
 ```{r}
 levels(crops$State)
+```
 
+In order to keep our model's complexity minimal, we will pre-process the data to consider zones in India instead of working at the granularity of individual states:
+
+```{r}
 # See https://en.wikipedia.org/wiki/Administrative_divisions_of_India
 
 states_to_zones <- c(
@@ -264,16 +284,7 @@ Next, we create a baseline additive model with all predictors.
 
 ```{r fig.height=5, fig.width=8}
 baseline <- lm(Production ~ ., data = crops.train)
-summary(baseline)
-plot_fitted_v_actual(baseline)
-assumptions_plots(baseline)
-plot_cooksd(baseline)
-car::vif(baseline)
-get_loocv_rmse(baseline)
-
-
-# TODO: remove add some other candidates, maybe a full additive as a "control"?
-# TODO: remove It turns out yield = production / area after looking at the data... seems like a good idea to exclude production?
+output_diagnostics(baseline)
 ```
 
 # Todo: Add code to show the influential point and warrant removal
@@ -286,11 +297,7 @@ idx_remove <- which.max(cooks.distance(baseline))
 crops.train.no_infl <- crops.train[-idx_remove, ]
 
 baseline.no_infl <- lm(Production ~ ., data = crops.train.no_infl)
-summary(baseline.no_infl)
-plot_fitted_v_actual(baseline.no_infl)
-assumptions_plots(baseline.no_infl)
-plot_cooksd(baseline.no_infl)
-get_loocv_rmse(baseline.no_infl)
+output_diagnostics(baseline.no_infl)
 ```
 
 
@@ -308,18 +315,13 @@ bc <- boxcox(baseline)
 (lambda <- bc$x[which.max(bc$y)])
 
 baseline.bc <- lm(bc_transform(Production, lambda) ~ ., data = crops.train)
-
-assumptions_plots(baseline.bc)
-
-bptest(baseline.bc)
-shapiro.test(resid(baseline.bc))
+output_diagnostics(baseline.bc)
 ```
 
 ***
 
 ```{r}
 # continuous-categorical interactions
-baseline.poly.form <- as.formula()
 baseline.poly <- lm(
   Production + 1 ~
     (poly(Crop_Year, degree = 2, raw = 1) +
@@ -330,13 +332,7 @@ baseline.poly <- lm(
       (Crop + Season + Zone),
   data = crops.train
 )
-summary(baseline.poly)
-plot_fitted_v_actual(baseline.poly)
-assumptions_plots(baseline.poly)
-plot_cooksd(baseline.poly)
-get_loocv_rmse(baseline.poly)
-bptest(baseline.poly)
-shapiro.test(resid(baseline.poly))
+output_diagnostics(baseline.poly)
 ```
 
 ```{r}
@@ -352,13 +348,7 @@ baseline.poly <- lm(
       (Crop + Season + Zone),
   data = crops.train.poly.no_infl
 )
-summary(baseline.poly)
-plot_fitted_v_actual(baseline.poly)
-assumptions_plots(baseline.poly)
-plot_cooksd(baseline.poly)
-get_loocv_rmse(baseline.poly)
-bptest(baseline.poly)
-shapiro.test(resid(baseline.poly))
+output_diagnostics(baseline.poly)
 ```
 
 ```{r}
@@ -375,14 +365,7 @@ baseline.poly.bc <- lm(
       (Crop + Season + Zone),
   data = crops.train.poly.no_infl
 )
-
-summary(baseline.poly.bc)
-plot_fitted_v_actual(baseline.poly.bc)
-assumptions_plots(baseline.poly.bc)
-plot_cooksd(baseline.poly.bc)
-get_loocv_rmse(baseline.poly.bc)
-bptest(baseline.poly.bc)
-shapiro.test(resid(baseline.poly.bc))
+output_diagnostics(baseline.poly.bc)
 ```
 
 ***
@@ -407,13 +390,7 @@ baseline.multi <- lm(
       (Crop + Season + Zone),
   data = crops.train
 )
-summary(baseline.multi)
-plot_fitted_v_actual(baseline.multi)
-assumptions_plots(baseline.multi)
-plot_cooksd(baseline.multi)
-get_loocv_rmse(baseline.multi)
-bptest(baseline.multi)
-shapiro.test(resid(baseline.multi))
+output_diagnostics(baseline.multi, vif = FALSE)
 ```
 
 ```{r}
@@ -439,13 +416,7 @@ baseline.multi <- lm(
       (Crop + Season + Zone),
   data = crops.train.multi.no_infl
 )
-summary(baseline.multi)
-plot_fitted_v_actual(baseline.multi)
-assumptions_plots(baseline.multi)
-plot_cooksd(baseline.multi)
-get_loocv_rmse(baseline.multi)
-bptest(baseline.multi)
-shapiro.test(resid(baseline.multi))
+output_diagnostics(baseline.multi, vif = FALSE)
 ```
 
 ```{r}
@@ -472,27 +443,14 @@ baseline.multi.bc <- lm(
       (Crop + Season + Zone),
   data = crops.train.multi.no_infl
 )
-
-summary(baseline.multi.bc)
-plot_fitted_v_actual(baseline.multi.bc)
-assumptions_plots(baseline.multi.bc)
-plot_cooksd(baseline.multi.bc)
-get_loocv_rmse(baseline.multi.bc)
-bptest(baseline.multi.bc)
-shapiro.test(resid(baseline.multi.bc))
+output_diagnostics(baseline.multi.bc, vif = FALSE)
 ```
 
 ***
 
 ```{r}
 model.aic.backward <- step(baseline.poly.bc, direction = "backward", trace = 0)
-summary(model.aic.backward)
-plot_fitted_v_actual(model.aic.backward)
-assumptions_plots(model.aic.backward)
-plot_cooksd(model.aic.backward)
-get_loocv_rmse(model.aic.backward)
-bptest(model.aic.backward)
-shapiro.test(resid(model.aic.backward))
+output_diagnostics(model.aic.backward)
 ```
 
 ```{r}
@@ -500,13 +458,7 @@ model.bic.backward <- step(baseline.poly.bc,
   direction = "backward", trace = 0,
   k = log(nrow(crops.train.poly.no_infl))
 )
-summary(model.bic.backward)
-plot_fitted_v_actual(model.bic.backward)
-assumptions_plots(model.bic.backward)
-plot_cooksd(model.bic.backward)
-get_loocv_rmse(model.bic.backward)
-bptest(model.bic.backward)
-shapiro.test(resid(model.bic.backward))
+output_diagnostics(model.bic.backward)
 ```
 
 
