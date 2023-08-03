@@ -66,6 +66,11 @@ get_loocv_rmse = function(model) {
 get_adj_r2 = function(model) {
   summary(model)$adj.r.squared
 }
+
+remove_infl_pts = function(model, data) {
+  infl_pt_idx = cooks.distance(baseline) > 4 / nrow(crops.train)
+  data[-infl_pt_idx,]
+}
 ```
 
 ---
@@ -81,6 +86,7 @@ library(plyr)
 library(car)
 library(glmnet)
 library(MASS)
+library(lmtest)
 ```
 
 ## Introduction
@@ -274,7 +280,7 @@ get_loocv_rmse(baseline.no_infl)
 # See https://www.statology.org/box-cox-transformation-in-r/
 
 # Define plotting area
-op <- par(pty = "s", mfrow = c(1, 2))
+set_plot_grid(1, 2)
 
 # Box-cox requires that the response be positive (0 doesn't work), so we add
 # 1 here (just need to remember to subtract 1 when giving actual predictions)
@@ -287,8 +293,73 @@ baseline.bc <- lm(bc_transform(Production, lambda) ~ ., data = crops.train)
 
 assumptions_plots(baseline.bc)
 
-par(op)
+bptest(baseline.bc)
+shapiro.test(resid(baseline.bc))
 ```
+
+```{r}
+baseline.poly = lm(Production + 1 ~ 
+                        (poly(Crop_Year, degree = 3, raw = 1) +
+                        poly(Area, degree = 3, raw = 1) +
+                        poly(Annual_Rainfall, degree = 3, raw = 1) +
+                        poly(Fertilizer, degree = 3, raw = 1) +
+                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (Crop + Season + Zone),
+                        data = crops.train)
+summary(baseline.poly)
+plot_fitted_v_actual(baseline.poly)
+assumptions_plots(baseline.poly)
+plot_cooksd(baseline.poly)
+# car::vif(baseline.poly)
+get_loocv_rmse(baseline.poly)
+bptest(baseline.poly)
+shapiro.test(resid(baseline.poly))
+```
+
+```{r}
+crops.train.poly.no_infl = remove_infl_pts(baseline.poly, crops.train)
+
+baseline.poly = lm(Production + 1 ~ 
+                        (poly(Crop_Year, degree = 3, raw = 1) +
+                        poly(Area, degree = 3, raw = 1) +
+                        poly(Annual_Rainfall, degree = 3, raw = 1) +
+                        poly(Fertilizer, degree = 3, raw = 1) +
+                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (Crop + Season + Zone),
+                        data = crops.train.poly.no_infl)
+summary(baseline.poly)
+plot_fitted_v_actual(baseline.poly)
+assumptions_plots(baseline.poly)
+plot_cooksd(baseline.poly)
+# car::vif(baseline.poly)
+get_loocv_rmse(baseline.poly)
+bptest(baseline.poly)
+shapiro.test(resid(baseline.poly))
+```
+
+```{r}
+bc = boxcox(baseline.poly)
+(lambda <- bc$x[which.max(bc$y)])
+
+baseline.poly.bc = lm(bc_transform(Production + 1, lambda) ~ 
+                        (poly(Crop_Year, degree = 3, raw = 1) +
+                        poly(Area, degree = 3, raw = 1) +
+                        poly(Annual_Rainfall, degree = 3, raw = 1) +
+                        poly(Fertilizer, degree = 3, raw = 1) +
+                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (Crop + Season + Zone),
+                        data = crops.train.poly.no_infl)
+
+summary(baseline.poly.bc)
+plot_fitted_v_actual(baseline.poly.bc)
+assumptions_plots(baseline.poly.bc)
+plot_cooksd(baseline.poly.bc)
+# car::vif(baseline.poly.bc)
+get_loocv_rmse(baseline.poly.bc)
+bptest(baseline.poly.bc)
+shapiro.test(resid(baseline.poly.bc))
+```
+
 
 ```{r}
 # simple_model = lm(Yield ~ .^2, data = crops[-744,])
@@ -303,14 +374,29 @@ par(op)
 ```
 
 ```{r}
-# f <- as.formula(Yield ~ .^2)
-# y <- crops$Yield
-# x <- (model.matrix(f, crops))
-# model.lasso.cv = cv.glmnet(x, y, alpha = 1)
-# best_lambda = model.lasso.cv$lambda.min
-# plot(model.lasso.cv)
-# 
-# best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
-# coef(best_model)
+f <- as.formula(bc_transform(Production + 1, lambda) ~ 
+                        (poly(Crop_Year, degree = 3, raw = 1) +
+                        poly(Area, degree = 3, raw = 1) +
+                        poly(Annual_Rainfall, degree = 3, raw = 1) +
+                        poly(Fertilizer, degree = 3, raw = 1) +
+                        poly(Pesticide, degree = 3, raw = 1)) *
+                        (Crop + Season + Zone))
+y <- crops$Production
+x <- (model.matrix(f, crops))
+model.lasso.cv = cv.glmnet(x, y, alpha = 1)
+best_lambda = model.lasso.cv$lambda.min
+plot(model.lasso.cv)
+
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+coef(best_model)
+
+summary(best_model)
+plot_fitted_v_actual(best_model)
+assumptions_plots(best_model)
+plot_cooksd(best_model)
+# car::vif(best_model)
+get_loocv_rmse(best_model)
+bptest(best_model)
+shapiro.test(resid(best_model))
 ```
 
