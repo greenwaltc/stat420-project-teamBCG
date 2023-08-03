@@ -263,6 +263,8 @@ vars.cat <- c("Crop", "Season", "Zone")
 
 Starting off, we do some exploration of the data, prepare train and test splits, and address problematic data.  
 
+Let's try some changes here.
+
 ```{r}
 set.seed(0)
 
@@ -333,6 +335,8 @@ baseline.poly <- lm(
   data = crops.train
 )
 output_diagnostics(baseline.poly)
+nrow(crops)
+
 ```
 
 ```{r}
@@ -461,7 +465,7 @@ model.bic.backward <- step(baseline.poly.bc,
 output_diagnostics(model.bic.backward)
 ```
 
-
+Some more stuff here.
 ```{r}
 f <- as.formula(bc_transform(Production + 1, lambda) ~
   (poly(Crop_Year, degree = 3, raw = 1) +
@@ -492,3 +496,8 @@ extract.coef(model.lasso.cv)
 
 ```{r}
 ```
+
+
+## Results
+
+Here we summarize LOOCV-RMSE for each of our models:
