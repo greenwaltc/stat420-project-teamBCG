@@ -119,6 +119,7 @@ library(glmnet)
 library(MASS)
 library(lmtest)
 library(coefplot)
+library(rlist)
 ```
 
 ## Introduction
@@ -943,7 +944,7 @@ Here we summarize results for the following models explored above:
 models.cropyear_cont = list(
   multi.full.cropyear_cont, multi.full.bc.cropyear_cont, multi.aic.backward.bc.cropyear_cont,
                multi.bic.backward.bc.cropyear_cont, multi.aic.forward.bc.cropyear_cont,
-               multi.bic.forward.bc.cropyear_cont,
+               multi.bic.forward.bc.cropyear_cont
   )
 
 models.cropyear_cat = list(
@@ -1025,7 +1026,7 @@ for (i in 1:length(models.cropyear_omit)) {
   train_adjr2.cropyear_omit[i] = summary(models.cropyear_omit[[i]])$adj.r.squared
 }
 
-kable(data.frame("Model" = c(modelNames.cropyear_cont, modelNames.cropyear_cat, modelNames.cropyear_omit), 
+kable(data.frame("Model" = do.call(c, c(modelNames.cropyear_cont, modelNames.cropyear_cat, modelNames.cropyear_omit)), 
                  "LOOCV-RMSE" = c(loocv_rmses.cropyear_cont, loocv_rmses.cropyear_cat, loocv_rmses.cropyear_omit),
                  "Train RMSE" = c(train_rmses.cropyear_cont, train_rmses.cropyear_cat, train_rmses.cropyear_omit), 
                  "Test RMSE" = c(test_rmses.cropyear_cont, test_rmses.cropyear_cat, test_rmses.cropyear_omit),
