@@ -5,17 +5,33 @@ date: "2023-07-31"
 author: "Team BCG: Cameron Greenwalt, Mark Bauer, Ben Carman"
 ---
 
----- 
-
 ```{r}
-# TODO: run inference on test dataset - Mark
-# TODO: Actually write the document - Mark
-# TODO: Create summary information table of models for both training and test datasets - Mark
-# todo: Try Crop_Year as both continuous, categorical, and excluded and compare results
+# TODO: backwards BIC for crop year factor have a long runtime - consider removing them?
+# TODO: inverse boxcox
+# TODO: clean up code
+# TODO: In results table, include a column with # of features
+# TODO: Actually write the document
 ```
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-# Helper functions
+## Libariries and Functions
+
+Below are some libraries and helper functions we utilize
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+library(plyr)
+library(car)
+library(glmnet)
+library(MASS)
+library(lmtest)
+library(coefplot)
+library(rlist)
+```
 
 ```{r}
 plot_fitted_resid <- function(model, pointcol = "dodgerblue", linecol = "darkorange") {
@@ -70,7 +86,7 @@ plot_cooksd <- function(model) {
 }
 
 bc_transform <- function(x, lambda) {
-  (x^lambda - 1) / lambda
+  ((x+1)^lambda - 1) / lambda
 }
 
 get_loocv_rmse <- function(model) {
@@ -102,35 +118,19 @@ output_diagnostics = function(model, vif = TRUE) {
     car::vif(model)
   }
 }
+
+inverse_transform_for_predictions = function(x, lambda) {
+  # (x*λ+1)^(1/λ)
+}
 ```
 
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r message=FALSE, warning=FALSE}
-library(tidyverse)
-library(knitr)
-library(plyr)
-library(car)
-library(glmnet)
-library(MASS)
-library(lmtest)
-library(coefplot)
-library(rlist)
-```
-
 ## Introduction
 
-In this project we will explore our ability to predict yields of grain crops in India based on some information about the land in which they were grown on (field size, general region), the type of grain, inputs used (fertilizer, pesticide), and weather (season, rain). 
+In this project we will explore our ability to predict the amount of production of grain crops in India based on some information about the land in which they were grown on (field size, general region), the type of grain, inputs used (fertilizer, pesticide), and weather (season, rain).
 
-```{r message=FALSE}
-crops <- read_csv("crop_yield.csv")
-```
-
-Here we provide a summary or the data, which can be found (here)[https://www.kaggle.com/datasets/akshatgupta7/crop-yield-in-indian-states-dataset].  
+Below we provide a summary or the data.  The source for the data can be found (here)[https://www.kaggle.com/datasets/akshatgupta7/crop-yield-in-indian-states-dataset].  
 
 Response - Production: The quantity of crop production (in metric tons).
 
@@ -145,7 +145,15 @@ Predictors
 - Fertilizer: The total amount of fertilizer used for the crop (in kilograms).
 - Pesticide: The total amount of pesticide used for the crop (in kilograms).
 
-It turns our original intended response, `Yield`, is a metric derived by computing `Production / Area`. It would be incorrect for us to include `Production` and `Area` as predictors in a model whose response is `Yield`. Instead, we remove `Yield` and use the remaining variables to predict `Production`.
+## Methods
+
+### Data import, exploration, and cleaning
+
+```{r message=FALSE}
+crops <- read_csv("crop_yield.csv")
+```
+
+It turns out (as mentioned above) our original intended response, `Yield`, is a metric derived by computing `Production / Area`. It would be incorrect for us to include `Production` and `Area` as predictors in a model whose response is `Yield`. Instead, we remove `Yield` and use the remaining variables to predict `Production`.
 
 ```{r}
 crops <- crops[, !(names(crops) %in% c("Yield"))]
