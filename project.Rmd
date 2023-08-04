@@ -180,7 +180,6 @@ crops <- crops[str_squish(tolower(crops$Crop)) %in% str_squish(tolower(grains)),
 crops$Crop <- as.factor(crops$Crop)
 crops$Season <- as.factor(crops$Season)
 crops$State <- as.factor(crops$State)
-crops$Crop_Year = as.factor(crops$Crop_Year)
 
 levels(crops$Crop)
 ```
@@ -253,28 +252,47 @@ crops$Zone <- as.factor(crops$Zone)
 levels(crops$Zone)
 ```
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Crop_Year as continuous
+
 ```{r fig.height=5, fig.width=10}
 vars.res <- "Production"
-vars.con <- c("Area", "Annual_Rainfall", "Fertilizer", "Pesticide")
-vars.cat <- c("Crop", "Season", "Zone", "Crop_Year")
+vars.con <- c("Area", "Annual_Rainfall", "Fertilizer", "Pesticide", "Crop_Year")
+vars.cat <- c("Crop", "Season", "Zone")
+```
+
+```{r}
+# Train-test split
+set.seed(0)
+
+sample <- sample(c(TRUE, FALSE), nrow(crops), replace = TRUE, prob = c(0.8, 0.2))
+crops.train <- crops[sample, ]
+crops.test.cropyear_cont <- crops[!sample, ]
+
+nrow(crops)
+nrow(crops.train)
+nrow(crops.test.cropyear_cont)
 ```
 
 ## Methods
 
 Starting off, we do some exploration of the data, prepare train and test splits, and address problematic data.  
-
-```{r}
-set.seed(0)
-
-nrow(crops)
-
-sample <- sample(c(TRUE, FALSE), nrow(crops), replace = TRUE, prob = c(0.8, 0.2))
-crops.train <- crops[sample, ]
-crops.test <- crops[!sample, ]
-
-nrow(crops.train)
-nrow(crops.test)
-```
 
 ```{r}
 pairs(crops.train[, c(vars.con, vars.res)])
@@ -283,8 +301,8 @@ pairs(crops.train[, c(vars.con, vars.res)])
 Next, we create a baseline additive model with all predictors.
 
 ```{r fig.height=5, fig.width=8}
-baseline <- lm(Production ~ ., data = crops.train)
-output_diagnostics(baseline)
+baseline.cropyear_cont <- lm(Production ~ ., data = crops.train)
+output_diagnostics(baseline.cropyear_cont)
 ```
 
 # Todo: Add code to show the influential point and warrant removal
@@ -292,12 +310,11 @@ output_diagnostics(baseline)
 Remove that one super influential point
 
 ```{r fig.height=5, fig.width=8}
-infl_pt_idx <- cooks.distance(baseline) > 4 / nrow(crops.train)
-idx_remove <- which.max(cooks.distance(baseline))
+idx_remove <- which.max(cooks.distance(baseline.cropyear_cont))
 crops.train.no_infl <- crops.train[-idx_remove, ]
 
-baseline.no_infl <- lm(Production ~ ., data = crops.train.no_infl)
-output_diagnostics(baseline.no_infl)
+baseline.no_infl.cropyear_cont <- lm(Production ~ ., data = crops.train.no_infl)
+output_diagnostics(baseline.no_infl.cropyear_cont)
 ```
 
 
@@ -309,51 +326,283 @@ set_plot_grid(1, 2)
 
 # Box-cox requires that the response be positive (0 doesn't work), so we add
 # 1 here (just need to remember to subtract 1 when giving actual predictions)
-baseline <- lm(I(Production + 1) ~ ., data = crops.train)
+baseline.cropyear_cont <- lm(I(Production + 1) ~ ., data = crops.train.no_infl)
 
-bc <- boxcox(baseline)
+bc <- boxcox(baseline.cropyear_cont)
 (lambda <- bc$x[which.max(bc$y)])
 
-baseline.bc <- lm(bc_transform(Production, lambda) ~ ., data = crops.train)
-output_diagnostics(baseline.bc)
+baseline.bc.cropyear_cont <- lm(bc_transform(Production + 1, lambda) ~ ., data = crops.train.no_infl)
+output_diagnostics(baseline.bc.cropyear_cont)
 ```
 
 ***
 
 ```{r}
 # continuous-categorical interactions
-baseline.poly.form = as.formula(Production + 1 ~ 
+baseline.poly.form.cropyear_cont = as.formula(Production + 1 ~ 
+                        (poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        poly(Crop_Year, degree = 2, raw = 1)) *
+                        (Crop + Season + Zone))
+baseline.poly.cropyear_cont = lm(baseline.poly.form.cropyear_cont, data = crops.train)
+output_diagnostics(baseline.poly.cropyear_cont, vif = 0)
+```
+
+```{r}
+crops.train.poly.no_infl <- crops.train[!idx_infl_pts(baseline.poly.cropyear_cont),]
+
+baseline.poly.cropyear_cont = lm(baseline.poly.form.cropyear_cont, data = crops.train.poly.no_infl)
+output_diagnostics(baseline.poly.cropyear_cont, vif = 0)
+```
+
+```{r}
+bc <- boxcox(baseline.poly.cropyear_cont)
+(lambda <- bc$x[which.max(bc$y)])
+
+baseline.poly.bc.cropyear_cont = lm(paste("bc_transform(Production + 1, lambda) ~ ", 
+                             paste(attr(terms(baseline.poly.form.cropyear_cont), 
+                                        which = "term.labels"), 
+                                   collapse = " + ")),
+                        data = crops.train.poly.no_infl)
+output_diagnostics(baseline.poly.bc.cropyear_cont, vif = 0)
+```
+
+***
+```{r}
+multi.form.cropyear_cont = as.formula(Production + 1 ~ 
+                        (poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        poly(Crop_Year, degree = 2, raw = 1) +
+                        I(sqrt(Area)) +
+                        I(sqrt(Annual_Rainfall)) +
+                        I(sqrt(Fertilizer)) +
+                        I(sqrt(Pesticide)) +
+                        I(sqrt(Crop_Year)) +
+                        I(log(Area)) +
+                        I(log(Annual_Rainfall)) +
+                        I(log(Fertilizer)) +
+                        I(log(Pesticide)) +
+                        I(log(Crop_Year))) *
+                        (Crop + Season + Zone))
+multi.full.cropyear_cont = lm(multi.form.cropyear_cont, data = crops.train)
+output_diagnostics(multi.full.cropyear_cont, vif = FALSE)
+```
+
+```{r}
+# TODO: I've removed all the influential points here. We may not want to do that.
+# In which case, we can remove this cell and use the model from the previous cell
+# to do the box-cox transformation in the following cell.
+crops.train.multi.no_infl <- crops.train[!idx_infl_pts(multi.full.cropyear_cont),]
+
+multi.full.cropyear_cont = lm(multi.form.cropyear_cont, data = crops.train.multi.no_infl)
+output_diagnostics(multi.full.cropyear_cont, vif = FALSE)
+```
+
+```{r}
+bc <- boxcox(multi.full.cropyear_cont)
+(lambda <- bc$x[which.max(bc$y)])
+
+multi.full.bc.cropyear_cont = lm(paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_cont),
+                                        which = "term.labels"),
+                                   collapse = " + ")),
+                        data = crops.train.multi.no_infl)
+output_diagnostics(multi.full.bc.cropyear_cont, vif = FALSE)
+```
+
+***
+
+```{r}
+multi.aic.backward.bc.cropyear_cont <- step(multi.full.bc.cropyear_cont, direction = "backward", trace = 0)
+output_diagnostics(multi.aic.backward.bc.cropyear_cont, vif = 0)
+```
+
+```{r}
+multi.bic.backward.bc.cropyear_cont <- step(multi.full.bc.cropyear_cont,
+  direction = "backward", trace = 0,
+  k = log(nrow(crops.train.multi.no_infl))
+)
+output_diagnostics(multi.bic.backward.bc.cropyear_cont, vif = 0)
+```
+
+```{r}
+multi.aic.forward.bc.cropyear_cont <- step(lm(bc_transform(Production + 1, lambda) ~ 1, data = crops.train.multi.no_infl),
+                                           scope = as.formula(
+                                             paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_cont),
+                                        which = "term.labels"),
+                                   collapse = " + "))
+                                           ),
+                             direction = "forward", trace = 0)
+output_diagnostics(multi.aic.forward.bc.cropyear_cont, vif = 0)
+```
+
+```{r}
+multi.bic.forward.bc.cropyear_cont <- step(lm(bc_transform(Production + 1, lambda) ~ 1, data = crops.train.multi.no_infl),
+                                           scope = as.formula(
+                                             paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_cont),
+                                        which = "term.labels"),
+                                   collapse = " + "))
+                                           ),
+                             direction = "forward", trace = 0,
+  k = log(nrow(crops.train.multi.no_infl))
+)
+output_diagnostics(multi.bic.forward.bc.cropyear_cont, vif = 0)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Crop_Year as categorical
+
+```{r fig.height=5, fig.width=10}
+vars.res <- "Production"
+vars.con <- c("Area", "Annual_Rainfall", "Fertilizer", "Pesticide")
+vars.cat <- c("Crop", "Season", "Zone", "Crop_Year")
+```
+
+```{r}
+crops$Crop_Year = as.factor(crops$Crop_Year)
+```
+
+
+```{r}
+# Train-test split
+set.seed(0)
+
+sample <- sample(c(TRUE, FALSE), nrow(crops), replace = TRUE, prob = c(0.8, 0.2))
+crops.train <- crops[sample, ]
+crops.test.cropyear_cat <- crops[!sample, ]
+
+nrow(crops)
+nrow(crops.train)
+nrow(crops.test.cropyear_cat)
+```
+
+## Methods
+
+Starting off, we do some exploration of the data, prepare train and test splits, and address problematic data.  
+
+```{r}
+pairs(crops.train[, c(vars.con, vars.res)])
+```
+
+Next, we create a baseline additive model with all predictors.
+
+```{r fig.height=5, fig.width=8}
+baseline.cropyear_cat <- lm(Production ~ ., data = crops.train)
+output_diagnostics(baseline.cropyear_cat)
+```
+
+# Todo: Add code to show the influential point and warrant removal
+
+Remove that one super influential point
+
+```{r fig.height=5, fig.width=8}
+idx_remove <- which.max(cooks.distance(baseline.cropyear_cat))
+crops.train.no_infl <- crops.train[-idx_remove, ]
+
+baseline.no_infl.cropyear_cat <- lm(Production ~ ., data = crops.train.no_infl)
+output_diagnostics(baseline.no_infl.cropyear_cat)
+```
+
+
+```{r fig.height=5, fig.width=8}
+# See https://www.statology.org/box-cox-transformation-in-r/
+
+# Define plotting area
+set_plot_grid(1, 2)
+
+# Box-cox requires that the response be positive (0 doesn't work), so we add
+# 1 here (just need to remember to subtract 1 when giving actual predictions)
+baseline.cropyear_cat <- lm(I(Production + 1) ~ ., data = crops.train.no_infl)
+
+bc <- boxcox(baseline.cropyear_cat)
+(lambda <- bc$x[which.max(bc$y)])
+
+baseline.bc.cropyear_cat <- lm(bc_transform(Production + 1, lambda) ~ ., data = crops.train.no_infl)
+output_diagnostics(baseline.bc.cropyear_cat)
+```
+
+***
+
+```{r}
+# continuous-categorical interactions
+baseline.poly.form.cropyear_cat = as.formula(Production + 1 ~ 
                         (poly(Area, degree = 2, raw = 1) +
                         poly(Annual_Rainfall, degree = 2, raw = 1) +
                         poly(Fertilizer, degree = 2, raw = 1) +
                         poly(Pesticide, degree = 2, raw = 1)) *
                         (Crop + Season + Zone + Crop_Year))
-baseline.poly = lm(baseline.poly.form, data = crops.train)
-output_diagnostics(baseline.poly, vif = 0)
+baseline.poly.cropyear_cat = lm(baseline.poly.form.cropyear_cat, data = crops.train)
+output_diagnostics(baseline.poly.cropyear_cat, vif = 0)
 ```
 
 ```{r}
-crops.train.poly.no_infl <- crops.train[!idx_infl_pts(baseline.poly),]
+crops.train.poly.no_infl <- crops.train[!idx_infl_pts(baseline.poly.cropyear_cat),]
 
-baseline.poly = lm(baseline.poly.form, data = crops.train.poly.no_infl)
-output_diagnostics(baseline.poly, vif = 0)
+baseline.poly.cropyear_cat = lm(baseline.poly.form.cropyear_cat, data = crops.train.poly.no_infl)
+output_diagnostics(baseline.poly.cropyear_cat, vif = 0)
 ```
 
 ```{r}
-bc <- boxcox(baseline.poly)
+bc <- boxcox(baseline.poly.cropyear_cat)
 (lambda <- bc$x[which.max(bc$y)])
 
-baseline.poly.bc = lm(paste("bc_transform(Production + 1, lambda) ~ ", 
-                             paste(attr(terms(baseline.poly.form), 
+baseline.poly.bc.cropyear_cat = lm(paste("bc_transform(Production + 1, lambda) ~ ", 
+                             paste(attr(terms(baseline.poly.form.cropyear_cat), 
                                         which = "term.labels"), 
                                    collapse = " + ")),
                         data = crops.train.poly.no_infl)
-output_diagnostics(baseline.poly.bc, vif = 0)
+output_diagnostics(baseline.poly.bc.cropyear_cat, vif = 0)
 ```
 
 ***
 ```{r}
-multi.form = as.formula(Production + 1 ~ 
+multi.form.cropyear_cat = as.formula(Production + 1 ~ 
                         (poly(Area, degree = 2, raw = 1) +
                         poly(Annual_Rainfall, degree = 2, raw = 1) +
                         poly(Fertilizer, degree = 2, raw = 1) +
@@ -367,59 +616,323 @@ multi.form = as.formula(Production + 1 ~
                         I(log(Fertilizer)) +
                         I(log(Pesticide))) *
                         (Crop + Season + Zone + Crop_Year))
-multi.full = lm(multi.form, data = crops.train)
-output_diagnostics(multi.full, vif = FALSE)
+multi.full.cropyear_cat = lm(multi.form.cropyear_cat, data = crops.train)
+output_diagnostics(multi.full.cropyear_cat, vif = FALSE)
 ```
 
 ```{r}
 # TODO: I've removed all the influential points here. We may not want to do that.
 # In which case, we can remove this cell and use the model from the previous cell
 # to do the box-cox transformation in the following cell.
-crops.train.multi.no_infl <- crops.train[!idx_infl_pts(multi.full),]
+crops.train.multi.no_infl <- crops.train[!idx_infl_pts(multi.full.cropyear_cat),]
 
-multi.full = lm(multi.form, data = crops.train.multi.no_infl)
-output_diagnostics(multi.full, vif = FALSE)
+multi.full.cropyear_cat = lm(multi.form.cropyear_cat, data = crops.train.multi.no_infl)
+output_diagnostics(multi.full.cropyear_cat, vif = FALSE)
 ```
 
 ```{r}
-bc <- boxcox(multi.full)
+bc <- boxcox(multi.full.cropyear_cat)
 (lambda <- bc$x[which.max(bc$y)])
 
-multi.full.bc = lm(paste("bc_transform(Production + 1, lambda) ~ ",
-                             paste(attr(terms(multi.form),
+multi.full.bc.cropyear_cat = lm(paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_cat),
                                         which = "term.labels"),
                                    collapse = " + ")),
                         data = crops.train.multi.no_infl)
-output_diagnostics(multi.full.bc, vif = FALSE)
+output_diagnostics(multi.full.bc.cropyear_cat, vif = FALSE)
 ```
 
 ***
 
 ```{r}
-# multi.aic.backward.bc <- step(multi.full.bc, direction = "backward", trace = 0)
-# output_diagnostics(multi.aic.backward.bc, vif = 0)
+multi.aic.backward.bc.cropyear_cat <- step(multi.full.bc.cropyear_cat, direction = "backward", trace = 0)
+output_diagnostics(multi.aic.backward.bc.cropyear_cat, vif = 0)
 ```
 
 ```{r}
-# multi.bic.backward.bc <- step(multi.full.bc,
-#   direction = "backward", trace = 0,
-#   k = log(nrow(crops.train.multi.no_infl))
-# )
-# output_diagnostics(multi.bic.backward.bc, vif = 0)
-```
-
-```{r}
-multi.aic.forward.bc <- step(multi.full.bc, direction = "forward", trace = 0)
-output_diagnostics(multi.aic.forward.bc, vif = 0)
-```
-
-```{r}
-multi.bic.forward.bc <- step(multi.full.bc,
-  direction = "forward", trace = 0,
+multi.bic.backward.bc.cropyear_cat <- step(multi.full.bc.cropyear_cat,
+  direction = "backward", trace = 0,
   k = log(nrow(crops.train.multi.no_infl))
 )
-output_diagnostics(multi.bic.forward.bc, vif = 0)
+output_diagnostics(multi.bic.backward.bc.cropyear_cat, vif = 0)
 ```
+
+```{r}
+multi.aic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production + 1, lambda) ~ 1, data = crops.train.multi.no_infl),
+                                           scope = as.formula(
+                                             paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_cat),
+                                        which = "term.labels"),
+                                   collapse = " + "))
+                                           ),
+                             direction = "forward", trace = 0)
+output_diagnostics(multi.aic.forward.bc.cropyear_cat, vif = 0)
+```
+
+```{r}
+multi.bic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production + 1, lambda) ~ 1, data = crops.train.multi.no_infl),
+                                           scope = as.formula(
+                                             paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_cat),
+                                        which = "term.labels"),
+                                   collapse = " + "))
+                                           ),
+                             direction = "forward", trace = 0,
+  k = log(nrow(crops.train.multi.no_infl))
+)
+output_diagnostics(multi.bic.forward.bc.cropyear_cat, vif = 0)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Crop_Year omitted
+
+```{r fig.height=5, fig.width=10}
+vars.res <- "Production"
+vars.con <- c("Area", "Annual_Rainfall", "Fertilizer", "Pesticide")
+vars.cat <- c("Crop", "Season", "Zone")
+```
+
+
+```{r}
+# Train-test split
+set.seed(0)
+
+sample <- sample(c(TRUE, FALSE), nrow(crops), replace = TRUE, prob = c(0.8, 0.2))
+crops.train <- crops[sample, ]
+crops.test.cropyear_omit <- crops[!sample, ]
+
+crops.train <- crops.train[, !(names(crops.train) %in% c("Crop_Year"))]
+crops.test.cropyear_omit <- crops.test.cropyear_omit[, !(names(crops.test.cropyear_omit) %in% c("Crop_Year"))]
+
+nrow(crops)
+nrow(crops.train)
+nrow(crops.test.cropyear_omit)
+```
+
+## Methods
+
+Starting off, we do some exploration of the data, prepare train and test splits, and address problematic data.  
+
+```{r}
+pairs(crops.train[, c(vars.con, vars.res)])
+```
+
+Next, we create a baseline additive model with all predictors.
+
+```{r fig.height=5, fig.width=8}
+baseline.cropyear_omit <- lm(Production ~ ., data = crops.train)
+output_diagnostics(baseline.cropyear_omit)
+```
+
+# Todo: Add code to show the influential point and warrant removal
+
+Remove that one super influential point
+
+```{r fig.height=5, fig.width=8}
+idx_remove <- which.max(cooks.distance(baseline.cropyear_omit))
+crops.train.no_infl <- crops.train[-idx_remove, ]
+
+baseline.no_infl.cropyear_omit <- lm(Production ~ ., data = crops.train.no_infl)
+output_diagnostics(baseline.no_infl.cropyear_omit)
+```
+
+
+```{r fig.height=5, fig.width=8}
+# See https://www.statology.org/box-cox-transformation-in-r/
+
+# Define plotting area
+set_plot_grid(1, 2)
+
+# Box-cox requires that the response be positive (0 doesn't work), so we add
+# 1 here (just need to remember to subtract 1 when giving actual predictions)
+baseline.cropyear_omit <- lm(I(Production + 1) ~ ., data = crops.train.no_infl)
+
+bc <- boxcox(baseline.cropyear_omit)
+(lambda <- bc$x[which.max(bc$y)])
+
+baseline.bc.cropyear_omit <- lm(bc_transform(Production + 1, lambda) ~ ., data = crops.train.no_infl)
+output_diagnostics(baseline.bc.cropyear_omit)
+```
+
+***
+
+```{r}
+# continuous-categorical interactions
+baseline.poly.form.cropyear_omit = as.formula(Production + 1 ~ 
+                        (poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1)) *
+                        (Crop + Season + Zone))
+baseline.poly.cropyear_omit = lm(baseline.poly.form.cropyear_omit, data = crops.train)
+output_diagnostics(baseline.poly.cropyear_omit, vif = 0)
+```
+
+```{r}
+crops.train.poly.no_infl <- crops.train[!idx_infl_pts(baseline.poly.cropyear_omit),]
+
+baseline.poly.cropyear_omit = lm(baseline.poly.form.cropyear_omit, data = crops.train.poly.no_infl)
+output_diagnostics(baseline.poly.cropyear_omit, vif = 0)
+```
+
+```{r}
+bc <- boxcox(baseline.poly.cropyear_omit)
+(lambda <- bc$x[which.max(bc$y)])
+
+baseline.poly.bc.cropyear_omit = lm(paste("bc_transform(Production + 1, lambda) ~ ", 
+                             paste(attr(terms(baseline.poly.form.cropyear_omit), 
+                                        which = "term.labels"), 
+                                   collapse = " + ")),
+                        data = crops.train.poly.no_infl)
+output_diagnostics(baseline.poly.bc.cropyear_omit, vif = 0)
+```
+
+***
+```{r}
+multi.form.cropyear_omit = as.formula(Production + 1 ~ 
+                        (poly(Area, degree = 2, raw = 1) +
+                        poly(Annual_Rainfall, degree = 2, raw = 1) +
+                        poly(Fertilizer, degree = 2, raw = 1) +
+                        poly(Pesticide, degree = 2, raw = 1) +
+                        I(sqrt(Area)) +
+                        I(sqrt(Annual_Rainfall)) +
+                        I(sqrt(Fertilizer)) +
+                        I(sqrt(Pesticide)) +
+                        I(log(Area)) +
+                        I(log(Annual_Rainfall)) +
+                        I(log(Fertilizer)) +
+                        I(log(Pesticide))) *
+                        (Crop + Season + Zone))
+multi.full.cropyear_omit = lm(multi.form.cropyear_omit, data = crops.train)
+output_diagnostics(multi.full.cropyear_omit, vif = FALSE)
+```
+
+```{r}
+# TODO: I've removed all the influential points here. We may not want to do that.
+# In which case, we can remove this cell and use the model from the previous cell
+# to do the box-cox transformation in the following cell.
+crops.train.multi.no_infl <- crops.train[!idx_infl_pts(multi.full.cropyear_omit),]
+
+multi.full.cropyear_omit = lm(multi.form.cropyear_omit, data = crops.train.multi.no_infl)
+output_diagnostics(multi.full.cropyear_omit, vif = FALSE)
+```
+
+```{r}
+bc <- boxcox(multi.full.cropyear_omit)
+(lambda <- bc$x[which.max(bc$y)])
+
+multi.full.bc.cropyear_omit = lm(paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_omit),
+                                        which = "term.labels"),
+                                   collapse = " + ")),
+                        data = crops.train.multi.no_infl)
+output_diagnostics(multi.full.bc.cropyear_omit, vif = FALSE)
+```
+
+***
+
+```{r}
+multi.aic.backward.bc.cropyear_omit <- step(multi.full.bc.cropyear_omit, direction = "backward", trace = 0)
+output_diagnostics(multi.aic.backward.bc.cropyear_omit, vif = 0)
+```
+
+```{r}
+multi.bic.backward.bc.cropyear_omit <- step(multi.full.bc.cropyear_omit,
+  direction = "backward", trace = 0,
+  k = log(nrow(crops.train.multi.no_infl))
+)
+output_diagnostics(multi.bic.backward.bc.cropyear_omit, vif = 0)
+```
+
+```{r}
+multi.aic.forward.bc.cropyear_omit <- step(lm(bc_transform(Production + 1, lambda) ~ 1, data = crops.train.multi.no_infl),
+                                           scope = as.formula(
+                                             paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_omit),
+                                        which = "term.labels"),
+                                   collapse = " + "))
+                                           ),
+                             direction = "forward", trace = 0)
+output_diagnostics(multi.aic.forward.bc.cropyear_omit, vif = 0)
+```
+
+```{r}
+multi.bic.forward.bc.cropyear_omit <- step(lm(bc_transform(Production + 1, lambda) ~ 1, data = crops.train.multi.no_infl),
+                                           scope = as.formula(
+                                             paste("bc_transform(Production + 1, lambda) ~ ",
+                             paste(attr(terms(multi.form.cropyear_omit),
+                                        which = "term.labels"),
+                                   collapse = " + "))
+                                           ),
+                             direction = "forward", trace = 0,
+  k = log(nrow(crops.train.multi.no_infl))
+)
+output_diagnostics(multi.bic.forward.bc.cropyear_omit, vif = 0)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Results
 
@@ -427,35 +940,96 @@ Here we summarize results for the following models explored above:
 
 ### TODO: Double check models/names used in this section, add models for other ways of representing "Year" in model
 ```{r}
-models = list(multi.full, multi.full.bc, multi.aic.backward.bc, 
-               multi.bic.backward.bc, multi.aic.forward.bc,
-               multi.bic.forward.bc)
-modelNames = c("multi.full", "multi.full.bc", "multi.aic.backward.bc", 
-               "multi.bic.backward.bc", "multi.aic.forward.bc",
-               "multi.bic.forward.bc")
+models.cropyear_cont = list(
+  multi.full.cropyear_cont, multi.full.bc.cropyear_cont, multi.aic.backward.bc.cropyear_cont,
+               multi.bic.backward.bc.cropyear_cont, multi.aic.forward.bc.cropyear_cont,
+               multi.bic.forward.bc.cropyear_cont,
+  )
+
+models.cropyear_cat = list(
+  multi.full.cropyear_cat, multi.full.bc.cropyear_cat, multi.aic.backward.bc.cropyear_cat,
+               multi.bic.backward.bc.cropyear_cat, multi.aic.forward.bc.cropyear_cat,
+               multi.bic.forward.bc.cropyear_cat
+  )
+
+models.cropyear_omit = list(
+  multi.full.cropyear_omit, multi.full.bc.cropyear_omit, multi.aic.backward.bc.cropyear_omit,
+               multi.bic.backward.bc.cropyear_omit, multi.aic.forward.bc.cropyear_omit,
+               multi.bic.forward.bc.cropyear_omit
+  )
+
+modelNames.cropyear_cont = list(
+  "multi.full.cropyear_cont", "multi.full.bc.cropyear_cont", "multi.aic.backward.bc.cropyear_cont",
+               "multi.bic.backward.bc.cropyear_cont", "multi.aic.forward.bc.cropyear_cont",
+               "multi.bic.forward.bc.cropyear_cont"
+)
+
+modelNames.cropyear_cat = list(
+  "multi.full.cropyear_cat", "multi.full.bc.cropyear_cat", "multi.aic.backward.bc.cropyear_cat",
+               "multi.bic.backward.bc.cropyear_cat", "multi.aic.forward.bc.cropyear_cat",
+               "multi.bic.forward.bc.cropyear_cat"
+)
+
+modelNames.cropyear_omit = list(
+  "multi.full.cropyear_omit", "multi.full.bc.cropyear_omit", "multi.aic.backward.bc.cropyear_omit",
+               "multi.bic.backward.bc.cropyear_omit", "multi.aic.forward.bc.cropyear_omit",
+               "multi.bic.forward.bc.cropyear_omit"
+)
 ```
 
 To begin, we will assess each model's test performance using LOOCV-RMSE:
 
 ```{r}
-loocv_rmses = rep(0,length(models))
-train_rmses = rep(0,length(models))
-test_rmses = rep(0,length(models))
-train_adjr2 = rep(0,length(models))
-for (i in 1:length(models)) {
-  loocv_rmses[i] = get_loocv_rmse(models[[i]])
-  train_rmses[i] = sqrt(mean(resid(models[[i]])^2))
-  test_rmses[i] = sqrt(
+loocv_rmses.cropyear_cont = rep(0,length(models.cropyear_cont))
+train_rmses.cropyear_cont = rep(0,length(models.cropyear_cont))
+test_rmses.cropyear_cont = rep(0,length(models.cropyear_cont))
+train_adjr2.cropyear_cont = rep(0,length(models.cropyear_cont))
+for (i in 1:length(models.cropyear_cont)) {
+  loocv_rmses.cropyear_cont[i] = get_loocv_rmse(models.cropyear_cont[[i]])
+  train_rmses.cropyear_cont[i] = sqrt(mean(resid(models.cropyear_cont[[i]])^2))
+  test_rmses.cropyear_cont[i] = sqrt(
     mean(
-      (crops.test$Production - predict(models[[i]], newdata = crops.test))^2
+      (crops.test.cropyear_cont$Production - predict(models.cropyear_cont[[i]], newdata = crops.test.cropyear_cont))^2
     )
   )
-  train_adjr2[i] = summary(models[[i]])$adj.r.squared
+  train_adjr2.cropyear_cont[i] = summary(models.cropyear_cont[[i]])$adj.r.squared
 }
 
-kable(data.frame("Model" = modelNames, "LOOCV-RMSE" = loocv_rmses,
-                 "Train RMSE" = train_rmses, "Test RMSE" = test_rmses,
-                 "Train Adj R-Squared" = train_adjr2))
+loocv_rmses.cropyear_cat = rep(0,length(models.cropyear_cat))
+train_rmses.cropyear_cat = rep(0,length(models.cropyear_cat))
+test_rmses.cropyear_cat = rep(0,length(models.cropyear_cat))
+train_adjr2.cropyear_cat = rep(0,length(models.cropyear_cat))
+for (i in 1:length(models.cropyear_cat)) {
+  loocv_rmses.cropyear_cat[i] = get_loocv_rmse(models.cropyear_cat[[i]])
+  train_rmses.cropyear_cat[i] = sqrt(mean(resid(models.cropyear_cat[[i]])^2))
+  test_rmses.cropyear_cat[i] = sqrt(
+    mean(
+      (crops.test.cropyear_cat$Production - predict(models.cropyear_cat[[i]], newdata = crops.test.cropyear_cat))^2
+    )
+  )
+  train_adjr2.cropyear_cat[i] = summary(models.cropyear_cat[[i]])$adj.r.squared
+}
+
+loocv_rmses.cropyear_omit = rep(0,length(models.cropyear_omit))
+train_rmses.cropyear_omit = rep(0,length(models.cropyear_omit))
+test_rmses.cropyear_omit = rep(0,length(models.cropyear_omit))
+train_adjr2.cropyear_omit = rep(0,length(models.cropyear_omit))
+for (i in 1:length(models.cropyear_omit)) {
+  loocv_rmses.cropyear_omit[i] = get_loocv_rmse(models.cropyear_omit[[i]])
+  train_rmses.cropyear_omit[i] = sqrt(mean(resid(models.cropyear_omit[[i]])^2))
+  test_rmses.cropyear_omit[i] = sqrt(
+    mean(
+      (crops.test.cropyear_omit$Production - predict(models.cropyear_omit[[i]], newdata = crops.test.cropyear_omit))^2
+    )
+  )
+  train_adjr2.cropyear_omit[i] = summary(models.cropyear_omit[[i]])$adj.r.squared
+}
+
+kable(data.frame("Model" = c(modelNames.cropyear_cont, modelNames.cropyear_cat, modelNames.cropyear_omit), 
+                 "LOOCV-RMSE" = c(loocv_rmses.cropyear_cont, loocv_rmses.cropyear_cat, loocv_rmses.cropyear_omit),
+                 "Train RMSE" = c(train_rmses.cropyear_cont, train_rmses.cropyear_cat, train_rmses.cropyear_omit), 
+                 "Test RMSE" = c(test_rmses.cropyear_cont, test_rmses.cropyear_cat, test_rmses.cropyear_omit),
+                 "Train Adj R-Squared" = c(train_adjr2.cropyear_cont, train_adjr2.cropyear_cat, train_adjr2.cropyear_omit)))
 ```
 
 
