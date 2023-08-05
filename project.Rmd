@@ -86,7 +86,7 @@ plot_cooksd <- function(model) {
 
 bc_transform <- function(x, lambda) {
   #((x)^lambda - 1) / lambda
-  bc(x, lambda)
+  MASSExtra::bc(x, lambda)
 }
 
 get_loocv_rmse <- function(model) {
@@ -574,7 +574,7 @@ output_diagnostics(multi.full.cropyear_cat, vif = FALSE)
 bc <- boxcox(multi.full.cropyear_cat)
 (multi.full.bc.cropyear_cat_lambda <- bc$x[which.max(bc$y)])
 
-multi.full.bc.cropyear_cat = lm(paste("bc_transform(Production, multi.full.cropyear_cat_lambda) ~ ",
+multi.full.bc.cropyear_cat = lm(paste("bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ ",
                              paste(attr(terms(multi.form.cropyear_cat),
                                         which = "term.labels"),
                                    collapse = " + ")),
@@ -596,9 +596,9 @@ output_diagnostics(multi.bic.backward.bc.cropyear_cat, vif = 0)
 ```
 
 ```{r}
-multi.aic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production, multi.full.cropyear_cat_lambda) ~ 1, data = crops.train.multi.no_infl),
+multi.aic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ 1, data = crops.train.multi.no_infl),
                                            scope = as.formula(
-                                             paste("bc_transform(Production, multi.full.cropyear_cat_lambda) ~ ",
+                                             paste("bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ ",
                              paste(attr(terms(multi.form.cropyear_cat),
                                         which = "term.labels"),
                                    collapse = " + "))
@@ -608,9 +608,9 @@ output_diagnostics(multi.aic.forward.bc.cropyear_cat, vif = 0)
 ```
 
 ```{r}
-multi.bic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production, multi.full.cropyear_cat_lambda) ~ 1, data = crops.train.multi.no_infl),
+multi.bic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ 1, data = crops.train.multi.no_infl),
                                            scope = as.formula(
-                                             paste("bc_transform(Production, multi.full.cropyear_cat_lambda) ~ ",
+                                             paste("bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ ",
                              paste(attr(terms(multi.form.cropyear_cat),
                                         which = "term.labels"),
                                    collapse = " + "))
