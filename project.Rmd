@@ -5,10 +5,6 @@ date: "2023-07-31"
 author: "Team BCG: Cameron Greenwalt, Mark Bauer, Ben Carman"
 ---
 
-```{r}
-# TODO: Remove TODO's
-```
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -288,11 +284,6 @@ We then do a quick examination of the pairs plot.
 pairs(crops.train[, c(vars.con, vars.res)])
 ```
 
-```{r message=FALSE}
-# TODO: Add some inferences from examining the pairs plot?
-# colinearity with Fert and Pest?
-```
-
 For our first model, we chose a baseline additive model with all predictors.
 
 ```{r fig.height=5, fig.width=8}
@@ -336,7 +327,7 @@ output_diagnostics(baseline.bc.cropyear_cont)
 
 ***
 
-Next, we move from our base additive model to one with interactions between the categorical variables.  We use a similar approach to examine and evaluate the model.  
+Next, we move from our base additive model to one with interactions between the categorical variables as well as ploynomial terms.  We do this in hopes of improved predictive power, as well as better results against the LINE assumptions.  We use a similar approach to examine and evaluate the model.  
 
 ```{r}
 # continuous-categorical interactions
@@ -372,7 +363,7 @@ output_diagnostics(baseline.poly.bc.cropyear_cont, vif = 0)
 
 ***
 
-Continuing on, we evaluate a model with other transformations of the predictors, including degree two, square roots, and logs of the continuous predictors.  
+Continuing on, we evaluate a model with other transformations of the predictors, including degree two, square roots, and logs of the continuous predictors (with the same improvements in mind).  
 
 ```{r}
 multi.form.cropyear_cont = as.formula(Production ~ 
@@ -417,7 +408,7 @@ output_diagnostics(multi.full.bc.cropyear_cont, vif = FALSE)
 
 ***
 
-We also want to evaluate whether our models can be made simpler, so we do variable selection using BIC on them
+We also want to evaluate whether our models can be made simpler, so we do variable selection using forward BIC on them.  
 
 ```{r echo=FALSE, message=FALSE}
 # multi.bic.backward.bc.cropyear_cont <- step(multi.full.bc.cropyear_cont,
@@ -900,8 +891,8 @@ kable(data.frame("Model" = do.call(c, c(modelNames.cropyear_cont, modelNames.cro
                  "Train Adj R-Squared" = c(train_adjr2.cropyear_cont, train_adjr2.cropyear_cat, train_adjr2.cropyear_omit)))
 ```
 
-What these results lead us to conclude is...
+## Discussion
 
-```{r}
-# TODO: write conclusion
-```
+After examining LINE assumptions and predictive performance against the test data we would select the "multi.bic.forward.bc.cropyear_cont" model, with "multi.bic.forward.bc.cropyear_cat" being a very close second.  These models also had the lowest number of predictors, with the other models over fitting relative to these.  
+
+It turns out that whether the crop year variable is categorical or continuous did not differentiate the models on its own, but it is very important for predictive power.  When omitted the model(s) performed significantly worse.  
