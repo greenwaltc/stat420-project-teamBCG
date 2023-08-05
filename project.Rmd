@@ -6,8 +6,6 @@ author: "Team BCG: Cameron Greenwalt, Mark Bauer, Ben Carman"
 ---
 
 ```{r}
-# TODO: backwards BIC for crop year factor have a long runtime - consider removing them?
-# TODO: clean up code
 # TODO: Remove TODO's
 ```
 
@@ -290,7 +288,7 @@ We then do a quick examination of the pairs plot.
 pairs(crops.train[, c(vars.con, vars.res)])
 ```
 
-```{r}
+```{r message=FALSE}
 # TODO: Add some inferences from examining the pairs plot?
 # colinearity with Fert and Pest?
 ```
@@ -419,31 +417,14 @@ output_diagnostics(multi.full.bc.cropyear_cont, vif = FALSE)
 
 ***
 
-We also want to evaluate whether our models can be made simpler, so we perform AIC and BIC on them.  
+We also want to evaluate whether our models can be made simpler, so we do variable selection using BIC on them
 
-```{r}
-multi.aic.backward.bc.cropyear_cont <- step(multi.full.bc.cropyear_cont, direction = "backward", trace = 0)
-output_diagnostics(multi.aic.backward.bc.cropyear_cont, vif = 0)
-```
-
-```{r}
-multi.bic.backward.bc.cropyear_cont <- step(multi.full.bc.cropyear_cont,
-  direction = "backward", trace = 0,
-  k = log(nrow(crops.train.multi.no_infl))
-)
-output_diagnostics(multi.bic.backward.bc.cropyear_cont, vif = 0)
-```
-
-```{r}
-multi.aic.forward.bc.cropyear_cont <- step(lm(bc_transform(Production, multi.full.bc.cropyear_cont_lambda) ~ 1, data = crops.train.multi.no_infl),
-                                           scope = as.formula(
-                                             paste("bc_transform(Production, multi.full.bc.cropyear_cont_lambda) ~ ",
-                             paste(attr(terms(multi.form.cropyear_cont),
-                                        which = "term.labels"),
-                                   collapse = " + "))
-                                           ),
-                             direction = "forward", trace = 0)
-output_diagnostics(multi.aic.forward.bc.cropyear_cont, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.bic.backward.bc.cropyear_cont <- step(multi.full.bc.cropyear_cont,
+#   direction = "backward", trace = 0,
+#   k = log(nrow(crops.train.multi.no_infl))
+# )
+# output_diagnostics(multi.bic.backward.bc.cropyear_cont, vif = 0)
 ```
 
 ```{r}
@@ -582,29 +563,29 @@ multi.full.bc.cropyear_cat = lm(paste("bc_transform(Production, multi.full.bc.cr
 output_diagnostics(multi.full.bc.cropyear_cat, vif = FALSE)
 ```
 
-```{r}
-multi.aic.backward.bc.cropyear_cat <- step(multi.full.bc.cropyear_cat, direction = "backward", trace = 0)
-output_diagnostics(multi.aic.backward.bc.cropyear_cat, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.aic.backward.bc.cropyear_cat <- step(multi.full.bc.cropyear_cat, direction = "backward", trace = 0)
+# output_diagnostics(multi.aic.backward.bc.cropyear_cat, vif = 0)
 ```
 
-```{r}
-multi.bic.backward.bc.cropyear_cat <- step(multi.full.bc.cropyear_cat,
-  direction = "backward", trace = 0,
-  k = log(nrow(crops.train.multi.no_infl))
-)
-output_diagnostics(multi.bic.backward.bc.cropyear_cat, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.bic.backward.bc.cropyear_cat <- step(multi.full.bc.cropyear_cat,
+#   direction = "backward", trace = 0,
+#   k = log(nrow(crops.train.multi.no_infl))
+# )
+# output_diagnostics(multi.bic.backward.bc.cropyear_cat, vif = 0)
 ```
 
-```{r}
-multi.aic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ 1, data = crops.train.multi.no_infl),
-                                           scope = as.formula(
-                                             paste("bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ ",
-                             paste(attr(terms(multi.form.cropyear_cat),
-                                        which = "term.labels"),
-                                   collapse = " + "))
-                                           ),
-                             direction = "forward", trace = 0)
-output_diagnostics(multi.aic.forward.bc.cropyear_cat, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.aic.forward.bc.cropyear_cat <- step(lm(bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ 1, data = crops.train.multi.no_infl),
+#                                            scope = as.formula(
+#                                              paste("bc_transform(Production, multi.full.bc.cropyear_cat_lambda) ~ ",
+#                              paste(attr(terms(multi.form.cropyear_cat),
+#                                         which = "term.labels"),
+#                                    collapse = " + "))
+#                                            ),
+#                              direction = "forward", trace = 0)
+# output_diagnostics(multi.aic.forward.bc.cropyear_cat, vif = 0)
 ```
 
 ```{r}
@@ -742,29 +723,29 @@ output_diagnostics(multi.full.bc.cropyear_omit, vif = FALSE)
 
 ***
 
-```{r}
-multi.aic.backward.bc.cropyear_omit <- step(multi.full.bc.cropyear_omit, direction = "backward", trace = 0)
-output_diagnostics(multi.aic.backward.bc.cropyear_omit, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.aic.backward.bc.cropyear_omit <- step(multi.full.bc.cropyear_omit, direction = "backward", trace = 0)
+# output_diagnostics(multi.aic.backward.bc.cropyear_omit, vif = 0)
 ```
 
-```{r}
-multi.bic.backward.bc.cropyear_omit <- step(multi.full.bc.cropyear_omit,
-  direction = "backward", trace = 0,
-  k = log(nrow(crops.train.multi.no_infl))
-)
-output_diagnostics(multi.bic.backward.bc.cropyear_omit, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.bic.backward.bc.cropyear_omit <- step(multi.full.bc.cropyear_omit,
+#   direction = "backward", trace = 0,
+#   k = log(nrow(crops.train.multi.no_infl))
+# )
+# output_diagnostics(multi.bic.backward.bc.cropyear_omit, vif = 0)
 ```
 
-```{r}
-multi.aic.forward.bc.cropyear_omit <- step(lm(bc_transform(Production, multi.full.bc.cropyear_omit_lambda) ~ 1, data = crops.train.multi.no_infl),
-                                           scope = as.formula(
-                                             paste("bc_transform(Production, multi.full.bc.cropyear_omit_lambda) ~ ",
-                             paste(attr(terms(multi.form.cropyear_omit),
-                                        which = "term.labels"),
-                                   collapse = " + "))
-                                           ),
-                             direction = "forward", trace = 0)
-output_diagnostics(multi.aic.forward.bc.cropyear_omit, vif = 0)
+```{r echo=FALSE, message=FALSE}
+# multi.aic.forward.bc.cropyear_omit <- step(lm(bc_transform(Production, multi.full.bc.cropyear_omit_lambda) ~ 1, data = crops.train.multi.no_infl),
+#                                            scope = as.formula(
+#                                              paste("bc_transform(Production, multi.full.bc.cropyear_omit_lambda) ~ ",
+#                              paste(attr(terms(multi.form.cropyear_omit),
+#                                         which = "term.labels"),
+#                                    collapse = " + "))
+#                                            ),
+#                              direction = "forward", trace = 0)
+# output_diagnostics(multi.aic.forward.bc.cropyear_omit, vif = 0)
 ```
 
 ```{r}
@@ -787,54 +768,52 @@ In the following section, we summarize results for the following models explored
 
 ```{r}
 models.cropyear_cont = list(
-  multi.full.cropyear_cont, multi.full.bc.cropyear_cont, multi.aic.backward.bc.cropyear_cont,
-               multi.bic.backward.bc.cropyear_cont, multi.aic.forward.bc.cropyear_cont,
-               multi.bic.forward.bc.cropyear_cont
-  )
+  baseline.poly.bc.cropyear_cont,
+  multi.full.bc.cropyear_cont,
+  multi.bic.forward.bc.cropyear_cont
+)
 
 models.cropyear_cat = list(
-  multi.full.cropyear_cat, multi.full.bc.cropyear_cat, multi.aic.backward.bc.cropyear_cat,
-               multi.bic.backward.bc.cropyear_cat, multi.aic.forward.bc.cropyear_cat,
-               multi.bic.forward.bc.cropyear_cat
-  )
-
+  baseline.poly.bc.cropyear_cat,
+  multi.full.bc.cropyear_cat,
+  multi.bic.forward.bc.cropyear_cat
+)
 
 models.cropyear_omit = list(
-  multi.full.cropyear_omit, multi.full.bc.cropyear_omit, multi.aic.backward.bc.cropyear_omit,
-               multi.bic.backward.bc.cropyear_omit, multi.aic.forward.bc.cropyear_omit,
-               multi.bic.forward.bc.cropyear_omit
-  )
+  baseline.poly.bc.cropyear_omit,
+  multi.full.bc.cropyear_omit,
+  multi.bic.forward.bc.cropyear_omit
+)
 
-models.cropyear_cont.lambdas = rep(multi.full.bc.cropyear_cont_lambda, 6)
-models.cropyear_cont.lambdas[1] = -1
+models.cropyear_cont.lambdas = rep(multi.full.bc.cropyear_cont_lambda, 3)
+models.cropyear_cont.lambdas[1] = baseline.poly.bc.cropyear_cont_lambda
 
-models.cropyear_cat.lambdas = rep(multi.full.bc.cropyear_cat_lambda, 6)
-models.cropyear_cat.lambdas[1] = -1
+models.cropyear_cat.lambdas = rep(multi.full.bc.cropyear_cat_lambda, 3)
+models.cropyear_cat.lambdas[1] = baseline.poly.bc.cropyear_cat_lambda
 
-models.cropyear_omit.lambdas = rep(multi.full.bc.cropyear_omit_lambda, 6)
-models.cropyear_omit.lambdas[1] = -1
+models.cropyear_omit.lambdas = rep(multi.full.bc.cropyear_omit_lambda, 3)
+models.cropyear_omit.lambdas[1] = baseline.poly.bc.cropyear_omit_lambda
 
 modelNames.cropyear_cont = list(
-  "multi.full.cropyear_cont", "multi.full.bc.cropyear_cont", "multi.aic.backward.bc.cropyear_cont",
-               "multi.bic.backward.bc.cropyear_cont", "multi.aic.forward.bc.cropyear_cont",
-               "multi.bic.forward.bc.cropyear_cont"
+  "baseline.poly.bc.cropyear_cont",
+  "multi.full.bc.cropyear_cont",
+  "multi.bic.forward.bc.cropyear_cont"
 )
 
 modelNames.cropyear_cat = list(
-  "multi.full.cropyear_cat", "multi.full.bc.cropyear_cat", "multi.aic.backward.bc.cropyear_cat",
-               "multi.bic.backward.bc.cropyear_cat", "multi.aic.forward.bc.cropyear_cat",
-               "multi.bic.forward.bc.cropyear_cat"
+  "baseline.poly.bc.cropyear_cat",
+  "multi.full.bc.cropyear_cat",
+  "multi.bic.forward.bc.cropyear_cat"
 )
 
 modelNames.cropyear_omit = list(
-  "multi.full.cropyear_omit", "multi.full.bc.cropyear_omit", "multi.aic.backward.bc.cropyear_omit",
-               "multi.bic.backward.bc.cropyear_omit", "multi.aic.forward.bc.cropyear_omit",
-               "multi.bic.forward.bc.cropyear_omit"
+  "baseline.poly.bc.cropyear_omit",
+  "multi.full.bc.cropyear_omit",
+  "multi.bic.forward.bc.cropyear_omit"
 )
 ```
 
 ```{r}
-options(digits = 4)
 loocv_rmses.cropyear_cont = rep(0,length(models.cropyear_cont))
 train_rmses.cropyear_cont = rep(0,length(models.cropyear_cont))
 test_rmses.cropyear_cont = rep(0,length(models.cropyear_cont))
@@ -846,19 +825,16 @@ for (i in 1:length(models.cropyear_cont)) {
   train_rmses.cropyear_cont[i] = sqrt(mean(resid(models.cropyear_cont[[i]])^2))
 
   lambda = models.cropyear_cont.lambdas[i]
-  raw_preds = predict(models.cropyear_cont[[i]], newdata = crops.test.cropyear_cont)
+  
   if(lambda == -1){
-    predictions = raw_preds
+    actuals = crops.test.cropyear_cont$Production
   } else {
-    predictions = inverse_bc_transform(
-      raw_preds,
-      models.cropyear_cat.lambdas[i]
-    )
+    actuals = bc_transform(crops.test.cropyear_cont$Production, lambda)
   }
 
   test_rmses.cropyear_cont[i] = sqrt(
     mean(
-      (crops.test.cropyear_cont$Production - predictions)^2
+      (actuals - predict(models.cropyear_cont[[i]], newdata = crops.test.cropyear_cont))^2
     )
   )
   train_adjr2.cropyear_cont[i] = summary(models.cropyear_cont[[i]])$adj.r.squared
@@ -875,19 +851,16 @@ for (i in 1:length(models.cropyear_cat)) {
   train_rmses.cropyear_cat[i] = sqrt(mean(resid(models.cropyear_cat[[i]])^2))
   
   lambda = models.cropyear_cat.lambdas[i]
-  raw_preds = predict(models.cropyear_cat[[i]], newdata = crops.test.cropyear_cat)
+
   if(lambda == -1){
-    predictions = raw_preds
+    actuals = crops.test.cropyear_cat$Production
   } else {
-    predictions = inverse_bc_transform(
-      raw_preds,
-      models.cropyear_cat.lambdas[i]
-    )
+    actuals = bc_transform(crops.test.cropyear_cat$Production, lambda)
   }
   
   test_rmses.cropyear_cat[i] = sqrt(
     mean(
-      (crops.test.cropyear_cat$Production - predictions)^2
+      (actuals - predict(models.cropyear_cat[[i]], newdata = crops.test.cropyear_cat))^2
     )
   )
   train_adjr2.cropyear_cat[i] = summary(models.cropyear_cat[[i]])$adj.r.squared
@@ -904,19 +877,16 @@ for (i in 1:length(models.cropyear_omit)) {
   train_rmses.cropyear_omit[i] = sqrt(mean(resid(models.cropyear_omit[[i]])^2))
   
   lambda = models.cropyear_omit.lambdas[i]
-  raw_preds = predict(models.cropyear_omit[[i]], newdata = crops.test.cropyear_omit)
+  
   if(lambda == -1){
-    predictions = raw_preds
+    actuals = crops.test.cropyear_omit$Production
   } else {
-    predictions = inverse_bc_transform(
-      raw_preds,
-      models.cropyear_omit.lambdas[i]
-    )
+    actuals = bc_transform(crops.test.cropyear_omit$Production, lambda)
   }
   
   test_rmses.cropyear_omit[i] = sqrt(
     mean(
-      (crops.test.cropyear_omit$Production - predictions)^2
+      (actuals - predict(models.cropyear_omit[[i]], newdata = crops.test.cropyear_omit))^2
     )
   )
   train_adjr2.cropyear_omit[i] = summary(models.cropyear_omit[[i]])$adj.r.squared
