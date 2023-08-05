@@ -952,6 +952,8 @@ kable(data.frame(
 
 ## Discussion
 
-After examining LINE assumptions and predictive performance against the test data we would select the "multi.bic.forward.bc.cropyear_cont" model, with "multi.bic.forward.bc.cropyear_cat" being a very close second.  These models also had the lowest number of predictors, with the other models over fitting relative to these.  
+After examining LINE assumptions and predictive performance against the test data we would select the “multi.bic.forward.bc.cropyear_cont” model, with “multi.bic.forward.bc.cropyear_cat” being a very close second. These models, having the fewest predictors, had the best performance on the test dataset and predictive power was our primary goal. Each of our other models overfit the training data significantly in comparison.
 
-It turns out that whether the crop year variable is categorical or continuous did not differentiate the models on its own, but it is very important for predictive power.  When omitted the model(s) performed significantly worse.  
+Not only do these models achieve good test performance, but they also strike a reasonable compromise in terms of satisfying our LINE assumptions. Our first, full additive model was very poor in terms of satisfying the equal variance and normality assumptions. By including several types of variable transformations on the predictors (polynomial, log, and square root), we saw significant improvement in terms of satisfying equal variance (as seen in the corresponding Fitted vs. Residual plots). Going further by including a box cox transformation of the response we saw significantly improved performance against the normality assumptions.
+
+On the topic of our crop year experiments, it turns out that whether the crop year variable is categorical or continuous did not differentiate the models on its own, but it is very important for predictive power.  When omitted the model(s) performed significantly worse.  
