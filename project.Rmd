@@ -23,9 +23,10 @@ Below are some libraries and helper functions we utilize
 library(tidyverse)
 library(knitr)
 library(plyr)
-library(car)
 library(glmnet)
 library(MASS)
+library(MASSExtra)
+library(car)
 library(lmtest)
 library(coefplot)
 library(rlist)
@@ -84,7 +85,8 @@ plot_cooksd <- function(model) {
 }
 
 bc_transform <- function(x, lambda) {
-  ((x)^lambda - 1) / lambda
+  #((x)^lambda - 1) / lambda
+  bc(x, lambda)
 }
 
 get_loocv_rmse <- function(model) {
@@ -117,8 +119,10 @@ output_diagnostics = function(model, vif = TRUE) {
   }
 }
 
-inverse_transform_for_predictions = function(x, lambda) {
+inverse_bc_transform = function(x, lambda) {
   # (x*λ+1)^(1/λ)
+  #((x*lambda)+1)^(1/lambda)
+  bc_inv(x, lambda)
 }
 ```
 
@@ -568,7 +572,7 @@ output_diagnostics(multi.full.cropyear_cat, vif = FALSE)
 
 ```{r}
 bc <- boxcox(multi.full.cropyear_cat)
-(multi.full.cropyear_cat_lambda <- bc$x[which.max(bc$y)])
+(multi.full.bc.cropyear_cat_lambda <- bc$x[which.max(bc$y)])
 
 multi.full.bc.cropyear_cat = lm(paste("bc_transform(Production, multi.full.cropyear_cat_lambda) ~ ",
                              paste(attr(terms(multi.form.cropyear_cat),
@@ -794,11 +798,21 @@ models.cropyear_cat = list(
                multi.bic.forward.bc.cropyear_cat
   )
 
+
 models.cropyear_omit = list(
   multi.full.cropyear_omit, multi.full.bc.cropyear_omit, multi.aic.backward.bc.cropyear_omit,
                multi.bic.backward.bc.cropyear_omit, multi.aic.forward.bc.cropyear_omit,
                multi.bic.forward.bc.cropyear_omit
   )
+
+models.cropyear_cont.lambdas = rep(multi.full.bc.cropyear_cont_lambda, 6)
+models.cropyear_cont.lambdas[1] = -1
+
+models.cropyear_cat.lambdas = rep(multi.full.bc.cropyear_cat_lambda, 6)
+models.cropyear_cat.lambdas[1] = -1
+
+models.cropyear_omit.lambdas = rep(multi.full.bc.cropyear_omit_lambda, 6)
+models.cropyear_omit.lambdas[1] = -1
 
 modelNames.cropyear_cont = list(
   "multi.full.cropyear_cont", "multi.full.bc.cropyear_cont", "multi.aic.backward.bc.cropyear_cont",
@@ -830,9 +844,21 @@ for (i in 1:length(models.cropyear_cont)) {
   num_predictors.cropyear_cont[i] = length(coef(models.cropyear_cont[[i]]))
   loocv_rmses.cropyear_cont[i] = get_loocv_rmse(models.cropyear_cont[[i]])
   train_rmses.cropyear_cont[i] = sqrt(mean(resid(models.cropyear_cont[[i]])^2))
+
+  lambda = models.cropyear_cont.lambdas[i]
+  raw_preds = predict(models.cropyear_cont[[i]], newdata = crops.test.cropyear_cont)
+  if(lambda == -1){
+    predictions = raw_preds
+  } else {
+    predictions = inverse_bc_transform(
+      raw_preds,
+      models.cropyear_cat.lambdas[i]
+    )
+  }
+
   test_rmses.cropyear_cont[i] = sqrt(
     mean(
-      (crops.test.cropyear_cont$Production - predict(models.cropyear_cont[[i]], newdata = crops.test.cropyear_cont))^2
+      (crops.test.cropyear_cont$Production - predictions)^2
     )
   )
   train_adjr2.cropyear_cont[i] = summary(models.cropyear_cont[[i]])$adj.r.squared
@@ -847,9 +873,21 @@ for (i in 1:length(models.cropyear_cat)) {
   num_predictors.cropyear_cat[i] = length(coef(models.cropyear_cat[[i]]))
   loocv_rmses.cropyear_cat[i] = get_loocv_rmse(models.cropyear_cat[[i]])
   train_rmses.cropyear_cat[i] = sqrt(mean(resid(models.cropyear_cat[[i]])^2))
+  
+  lambda = models.cropyear_cat.lambdas[i]
+  raw_preds = predict(models.cropyear_cat[[i]], newdata = crops.test.cropyear_cat)
+  if(lambda == -1){
+    predictions = raw_preds
+  } else {
+    predictions = inverse_bc_transform(
+      raw_preds,
+      models.cropyear_cat.lambdas[i]
+    )
+  }
+  
   test_rmses.cropyear_cat[i] = sqrt(
     mean(
-      (crops.test.cropyear_cat$Production - predict(models.cropyear_cat[[i]], newdata = crops.test.cropyear_cat))^2
+      (crops.test.cropyear_cat$Production - predictions)^2
     )
   )
   train_adjr2.cropyear_cat[i] = summary(models.cropyear_cat[[i]])$adj.r.squared
@@ -864,9 +902,21 @@ for (i in 1:length(models.cropyear_omit)) {
   num_predictors.cropyear_omit[i] = length(coef(models.cropyear_omit[[i]]))
   loocv_rmses.cropyear_omit[i] = get_loocv_rmse(models.cropyear_omit[[i]])
   train_rmses.cropyear_omit[i] = sqrt(mean(resid(models.cropyear_omit[[i]])^2))
+  
+  lambda = models.cropyear_omit.lambdas[i]
+  raw_preds = predict(models.cropyear_omit[[i]], newdata = crops.test.cropyear_omit)
+  if(lambda == -1){
+    predictions = raw_preds
+  } else {
+    predictions = inverse_bc_transform(
+      raw_preds,
+      models.cropyear_omit.lambdas[i]
+    )
+  }
+  
   test_rmses.cropyear_omit[i] = sqrt(
     mean(
-      (crops.test.cropyear_omit$Production - predict(models.cropyear_omit[[i]], newdata = crops.test.cropyear_omit))^2
+      (crops.test.cropyear_omit$Production - predictions)^2
     )
   )
   train_adjr2.cropyear_omit[i] = summary(models.cropyear_omit[[i]])$adj.r.squared
